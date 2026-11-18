@@ -1,0 +1,18 @@
+# Database Postgres chạy trên máy để phát triển.
+# Bật: docker compose up -d    Tắt: docker compose down
+services:
+  db:
+    image: postgres:17
+    container_name: skipli-food-menu-db
+    restart: unless-stopped
+    ports:
+      - "5433:5432" # dùng cổng 5433 để không đụng Postgres của dự án khác
+    environment:
+      POSTGRES_USER: skipli
+      POSTGRES_PASSWORD: skipli_local_dev
+      POSTGRES_DB: skipli_food_menu
+    volumes:
+      - skipli-food-menu-db:/var/lib/postgresql/data
+
+volumes:
+  skipli-food-menu-db:

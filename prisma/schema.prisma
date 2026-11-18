@@ -1,0 +1,213 @@
+// Mô hình dữ liệu của Skipli Food Menu.
+// Sửa file này rồi chạy: npm run db:migrate -- --name <ten-thay-doi>
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── Tài khoản và đăng nhập ─────────────────────────
+
+model User {
+  id          String       @id @default(cuid())
+  email       String       @unique
+  name        String?
+  createdAt   DateTime     @default(now())
+  sessions    Session[]
+  restaurants Restaurant[]
+}
+
+// Link đăng nhập gửi qua email. Chỉ lưu mã băm, không lưu mã gốc.
+model LoginToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, createdAt])
+}
+
+// Phiên đăng nhập. Cookie giữ mã gốc, database chỉ giữ mã băm.
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ───────────────────────────── Quán ─────────────────────────────
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum ContactButton {
+  NONE
+  CUSTOM_LINK
+  PHONE
+  WHATSAPP
+  EMAIL
+  DIRECTIONS
+}
+
+model Restaurant {
+  id          String  @id @default(cuid())
+  ownerId     String
+  owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  slug        String  @unique // phần sau /@ trong link
+  name        String
+  tagline     String?
+  description String? // cho phép định dạng đơn giản (đậm, nghiêng, danh sách)
+  country     String  @default("US")
+  currency    String  @default("USD")
+
+  // Ảnh (để trống khi chưa có kho ảnh)
+  logoUrl  String?
+  coverUrl String?
+
+  accentColor String @default("#1f4fae")
+
+  // Địa chỉ
+  addressLine   String?
+  city          String?
+  region        String? // bang
+  postalCode    String?
+  googleMapsUrl String?
+
+  // Nút liên hệ: để trống nghĩa là tắt
+  customLinkLabel String?
+  customLinkUrl   String?
+  phone           String?
+  whatsapp        String?
+  contactEmail    String?
+  showDirections  Boolean       @default(false)
+  primaryButton   ContactButton @default(NONE)
+  secondaryButton ContactButton @default(NONE)
+
+  // SEO
+  seoTitle       String?
+  seoDescription String?
+  inSitemap      Boolean @default(false)
+
+  isPublished Boolean @default(false) // trang tắt thì link và QR báo "chưa mở"
+  plan        Plan    @default(FREE) // gắn Stripe ở phase sau
+
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  categories Category[]
+  items      MenuItem[]
+  extras     Extra[]
+  allergens  Allergen[]
+
+  @@index([ownerId])
+}
+
+// ───────────────────────────── Menu ─────────────────────────────
+
+model Category {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  position     Int        @default(0)
+  isVisible    Boolean    @default(true)
+
+  // Giờ phục vụ. Ngày trống = luôn phục vụ. Ngày: 0 = Chủ nhật … 6 = Thứ bảy.
+  // Giờ dạng "HH:MM". Trang khách vẫn hiện danh mục, chỉ ghi giờ bên cạnh.
+  servingDays  Int[]   @default([])
+  servingFrom  String?
+  servingUntil String?
+
+  items MenuItem[]
+
+  @@index([restaurantId, position])
+}
+
+enum DietaryTag {
+  VEGETARIAN
+  VEGAN
+  GLUTEN_FREE
+  DAIRY_FREE
+  NUT_FREE
+  HALAL
+  SPICY
+}
+
+model MenuItem {
+  id           String       @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  categoryId   String
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name         String
+  description  String?
+  priceCents   Int?         // để trống = không ghi giá (ví dụ "giá theo mùa")
+  imageUrl     String?
+  position     Int          @default(0)
+  isVisible    Boolean      @default(true)
+  isSoldOut    Boolean      @default(false)
+  dietaryTags  DietaryTag[] @default([])
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  extras    MenuItemExtra[]
+  allergens MenuItemAllergen[]
+
+  @@index([restaurantId])
+  @@index([categoryId, position])
+}
+
+// Món thêm có giá (thêm phô mai, thêm sốt...)
+model Extra {
+  id           String          @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant      @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  priceCents   Int             @default(0)
+  position     Int             @default(0)
+  items        MenuItemExtra[]
+
+  @@index([restaurantId, position])
+}
+
+model MenuItemExtra {
+  itemId  String
+  item    MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  extraId String
+  extra   Extra    @relation(fields: [extraId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, extraId])
+}
+
+// Chất gây dị ứng. Mã A, B, C… tính theo thứ tự (position), kéo để đổi thứ tự.
+model Allergen {
+  id           String             @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant         @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  position     Int                @default(0)
+  items        MenuItemAllergen[]
+
+  @@index([restaurantId, position])
+}
+
+model MenuItemAllergen {
+  itemId     String
+  item       MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  allergenId String
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, allergenId])
+}
