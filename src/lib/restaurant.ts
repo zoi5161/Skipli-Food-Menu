@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/auth";
 import { slugify } from "@/lib/menu/format";
 
 // Những link không được dùng làm tên quán (trùng đường dẫn của app).
-const RESERVED_SLUGS = new Set(["admin", "api", "app", "auth", "dashboard", "login", "logout", "menu", "onboarding", "settings", "support"]);
+export const RESERVED_SLUGS = new Set(["admin", "api", "app", "auth", "dashboard", "login", "logout", "menu", "onboarding", "preview", "settings", "support"]);
 
 /**
  * Quán của người đang đăng nhập. Bản đầu mỗi tài khoản một quán.

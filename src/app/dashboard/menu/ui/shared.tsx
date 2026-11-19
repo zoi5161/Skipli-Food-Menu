@@ -12,7 +12,7 @@ export function useSave() {
   const toast = useToast();
   const [pending, startTransition] = useTransition();
 
-  function run(action: () => Promise<ActionResult>, successMessage?: string, onDone?: (r: ActionResult) => void) {
+  function run(action: () => Promise<ActionResult>, successMessage?: string, onDone?: (r: ActionResult) => unknown) {
     startTransition(async () => {
       try {
         const result = await action();
@@ -21,7 +21,7 @@ export function useSave() {
         } else {
           toast(result.error, "error");
         }
-        onDone?.(result);
+        await onDone?.(result);
       } catch {
         toast("Could not save. Check your connection and try again.", "error");
       }

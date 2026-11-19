@@ -1,5 +1,5 @@
 // Kiểu dữ liệu gọn gửi xuống trình duyệt (chỉ những trường giao diện cần).
-import type { DietaryTagValue } from "./format";
+import type { DietaryTagValue, Variant } from "./format";
 
 export type MenuCategory = {
   id: string;
@@ -17,9 +17,11 @@ export type MenuItemRow = {
   name: string;
   description: string | null;
   priceCents: number | null;
+  variants: Variant[];
   imageUrl: string | null;
   isVisible: boolean;
   isSoldOut: boolean;
+  isFeatured: boolean;
   dietaryTags: DietaryTagValue[];
   extraIds: string[];
   allergenIds: string[];

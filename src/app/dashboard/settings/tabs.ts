@@ -1,0 +1,41 @@
+import type { WeekHours } from "@/lib/menu/hours";
+import type { MenuStyleKey } from "@/lib/menu/styles";
+
+export const SETTINGS_TABS = ["general", "location", "page", "design", "buttons"] as const;
+export type SettingsTab = (typeof SETTINGS_TABS)[number];
+export const SETTINGS_TAB_LABEL: Record<SettingsTab, string> = { general: "General", location: "Location & hours", page: "Page", design: "Design", buttons: "Buttons" };
+
+export type SettingsData = {
+  slug: string;
+  name: string;
+  tagline: string | null;
+  description: string | null;
+  country: string;
+  currency: string;
+  googleMapsUrl: string | null;
+  logoUrl: string | null;
+  coverUrl: string | null;
+  galleryUrls: string[];
+  addressNote: string | null;
+  openingHours: WeekHours | null;
+  timeZone: string;
+  addressLine: string | null;
+  city: string | null;
+  region: string | null;
+  postalCode: string | null;
+  isPublished: boolean;
+  accentColor: string;
+  menuStyle: MenuStyleKey;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  inSitemap: boolean;
+  customLinkLabel: string | null;
+  customLinkUrl: string | null;
+  phone: string | null;
+  whatsapp: string | null;
+  contactEmail: string | null;
+  showDirections: boolean;
+  primaryButton: "NONE" | "CUSTOM_LINK" | "PHONE" | "WHATSAPP" | "EMAIL" | "DIRECTIONS";
+  secondaryButton: "NONE" | "CUSTOM_LINK" | "PHONE" | "WHATSAPP" | "EMAIL" | "DIRECTIONS";
+  publicHost: string;
+};

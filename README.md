@@ -37,7 +37,8 @@ npm run dev
 
 1. Mở http://localhost:3300/login, nhập `demo@example.com`.
 2. Khi chạy trên máy, app chưa gửi email thật: link đăng nhập hiện ngay trên trang (và in ra terminal). Bấm link, rồi bấm "Continue".
-3. Vào **Menu** để sửa danh mục, món, giá, extra, dị ứng.
+3. Vào **Menu** để sửa danh mục, món, giá, extra, dị ứng; vào **Settings** để sửa thông tin quán, màu, nút liên hệ, bật/tắt trang.
+4. Trang khách xem: http://localhost:3300/@lantern-and-ladle (quán demo đã bật sẵn).
 
 Quán demo "Lantern & Ladle" là quán giả, số điện thoại dạng 555 (không có thật).
 Chạy lại `npx prisma db seed` để đưa quán demo về trạng thái ban đầu.
@@ -59,6 +60,11 @@ npm run test:e2e  # kiểm tra trên Chrome, cả khung máy tính và điện t
 | `npm run db:up` / `npm run db:down` | Bật / tắt database |
 | `npm run db:migrate` | Cập nhật cấu trúc database theo `prisma/schema.prisma` |
 | `npm run db:studio` | Mở giao diện xem dữ liệu |
+
+## Đưa lên mạng
+
+Xem hướng dẫn từng bước trong [docs/trien-khai.md](docs/trien-khai.md) (Vercel + Neon + Resend).
+Chạy thử tải: `node scripts/load-test.mjs --url <địa chỉ> --mode page`.
 
 ## Lưu ý
 

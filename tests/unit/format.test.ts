@@ -1,14 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  allergenCode,
-  centsToInput,
-  formatClock,
-  formatDays,
-  formatPrice,
-  formatServingTimes,
-  parsePriceInput,
-  slugify,
-} from "@/lib/menu/format";
+import { allergenCode, centsToInput, formatClock, formatDays, formatPrice, formatServingTimes, parsePriceInput, slugify, priceDisplay } from "@/lib/menu/format";
 
 describe("price", () => {
   it("formats cents as USD", () => {
@@ -78,5 +69,30 @@ describe("serving times", () => {
     expect(formatServingTimes([], "07:00", "11:00")).toBe("Every day · 7:00 AM–11:00 AM");
     expect(formatServingTimes([6, 0], null, null)).toBe("Sat, Sun · All day");
     expect(formatServingTimes([], null, null)).toBe("");
+  });
+});
+
+describe("priceDisplay (giá theo cỡ)", () => {
+  it("một giá, không giá", () => {
+    expect(priceDisplay(1250, [], "USD")).toEqual({ kind: "single", text: "$12.50" });
+    expect(priceDisplay(null, [], "USD")).toBeNull();
+  });
+  it("2 cỡ tên ngắn: hiện từng cỡ", () => {
+    expect(priceDisplay(1000, [{ name: "Glass", priceCents: 1000 }, { name: "Bottle", priceCents: 3600 }], "USD")).toEqual({
+      kind: "sizes",
+      parts: [
+        { name: "Glass", price: "$10.00" },
+        { name: "Bottle", price: "$36.00" },
+      ],
+    });
+  });
+  it("nhiều cỡ hoặc tên dài: 'from' giá thấp nhất", () => {
+    const three = [
+      { name: "Small", priceCents: 400 },
+      { name: "Medium", priceCents: 350 },
+      { name: "Large", priceCents: 475 },
+    ];
+    expect(priceDisplay(350, three, "USD")).toEqual({ kind: "from", text: "from $3.50" });
+    expect(priceDisplay(800, [{ name: "Short stack (2)", priceCents: 800 }, { name: "Full stack (3)", priceCents: 1100 }], "USD")).toEqual({ kind: "from", text: "from $8.00" });
   });
 });

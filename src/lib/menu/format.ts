@@ -149,3 +149,31 @@ export const DIETARY_LABEL: Record<DietaryTagValue, string> = {
   HALAL: "Halal",
   SPICY: "Spicy",
 };
+
+// ── Giá theo cỡ ─────────────────────────────────────
+
+export type Variant = { name: string; priceCents: number };
+export const MAX_VARIANTS = 6;
+
+/**
+ * Cách hiện giá của một món:
+ * - một giá: "$12.00"
+ * - 2 cỡ tên ngắn: từng cỡ ("Glass $10.00 · Bottle $36.00")
+ * - nhiều cỡ hơn: "from $4.00"
+ * - không có giá: null
+ */
+export type PriceDisplay =
+  | { kind: "single"; text: string }
+  | { kind: "sizes"; parts: { name: string; price: string }[] }
+  | { kind: "from"; text: string }
+  | null;
+
+export function priceDisplay(priceCents: number | null, variants: Variant[], currency: string): PriceDisplay {
+  if (variants.length > 0) {
+    if (variants.length <= 2 && variants.every((v) => v.name.length <= 12)) {
+      return { kind: "sizes", parts: variants.map((v) => ({ name: v.name, price: formatPrice(v.priceCents, currency) })) };
+    }
+    return { kind: "from", text: `from ${formatPrice(Math.min(...variants.map((v) => v.priceCents)), currency)}` };
+  }
+  return priceCents === null ? null : { kind: "single", text: formatPrice(priceCents, currency) };
+}

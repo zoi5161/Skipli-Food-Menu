@@ -3,7 +3,7 @@
 import { useOptimistic, useState, useTransition } from "react";
 import { SortableList } from "@/components/sortable-list";
 import { Button, EmptyState, Toggle, cx, useToast } from "@/components/ui";
-import { DIETARY_LABEL, allergenCode, centsToInput, formatServingTimes } from "@/lib/menu/format";
+import { DIETARY_LABEL, allergenCode, centsToInput, formatPrice, formatServingTimes } from "@/lib/menu/format";
 import type { MenuCategory, MenuData, MenuItemRow } from "@/lib/menu/types";
 import { reorder, setItemFlags, setItemPrice } from "../actions";
 import { CategoryDialog } from "./category-dialog";
@@ -142,23 +142,43 @@ function ItemRow({
   return (
     <div className={cx("flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 sm:flex-nowrap sm:px-4", !flags.isVisible && "bg-neutral-50")}>
       {handle}
-      <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
-        <span className={cx("font-medium", !flags.isVisible && "text-neutral-400")}>{item.name}</span>
-        {codes && <sup className="ml-1 font-mono text-[11px] text-neutral-500">{codes}</sup>}
-        <span className="mt-1 flex flex-wrap gap-1">
-          {flags.isSoldOut && <Badge tone="amber">Sold out</Badge>}
-          {!flags.isVisible && <Badge>Hidden</Badge>}
-          {item.dietaryTags.map((t) => (
-            <Badge key={t} tone="green">
-              {DIETARY_LABEL[t]}
-            </Badge>
-          ))}
+      <button type="button" onClick={onEdit} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        {item.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh nhỏ của món
+          <img src={item.imageUrl} alt="" className={cx("h-11 w-11 shrink-0 rounded-lg object-cover", !flags.isVisible && "opacity-50")} />
+        ) : (
+          <span className="h-11 w-11 shrink-0 rounded-lg bg-neutral-100" aria-hidden />
+        )}
+        <span className="min-w-0">
+          <span className={cx("font-medium", !flags.isVisible && "text-neutral-400")}>{item.name}</span>
+          {codes && <sup className="ml-1 font-mono text-[11px] text-neutral-500">{codes}</sup>}
+          <span className="mt-1 flex flex-wrap gap-1">
+            {item.isFeatured && <Badge tone="brand">Chef&apos;s pick</Badge>}
+            {flags.isSoldOut && <Badge tone="amber">Sold out</Badge>}
+            {!flags.isVisible && <Badge>Hidden</Badge>}
+            {item.dietaryTags.map((t) => (
+              <Badge key={t} tone="green">
+                {DIETARY_LABEL[t]}
+              </Badge>
+            ))}
+          </span>
         </span>
       </button>
 
       {/* Hàng thứ hai trên điện thoại: giá + công tắc */}
       <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
-        <QuickPrice key={item.priceCents ?? "none"} item={item} currency={currency} />
+        {item.variants.length > 0 ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            title="This item has sizes. Open it to change each price."
+            className="w-20 rounded-lg bg-neutral-100 py-1.5 pr-2 text-right text-sm text-neutral-600 tabular-nums sm:w-24"
+          >
+            from {formatPrice(Math.min(...item.variants.map((v) => v.priceCents)), currency)}
+          </button>
+        ) : (
+          <QuickPrice key={item.priceCents ?? "none"} item={item} currency={currency} />
+        )}
         <label className="flex items-center gap-2 text-xs text-neutral-500">
           <span className="whitespace-nowrap">Sold out</span>
           <Toggle checked={flags.isSoldOut} onChange={(v) => update({ isSoldOut: v })} label={`Sold out: ${item.name}`} tone="amber" />

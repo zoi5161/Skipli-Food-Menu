@@ -8,6 +8,7 @@ import { CategoriesTab } from "./categories-tab";
 import { CategoryDialog } from "./category-dialog";
 import { ItemDialog } from "./item-dialog";
 import { ItemsTab } from "./items-tab";
+import { ScanMenuButton } from "./scan-menu";
 import { AllergensTab, ExtrasTab } from "./simple-list-tab";
 import { MENU_TABS, TAB_LABEL, type MenuTab } from "../tabs";
 
@@ -28,9 +29,12 @@ export function MenuEditor({ data, tab }: { data: MenuData; tab: MenuTab }) {
             </p>
           </div>
           {(tab === "items" || tab === "categories") && (
-            <Button onClick={() => setAdding(true)} className="px-5 py-2.5">
-              {tab === "items" && hasCategories ? "Add an item" : "Add a category"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <ScanMenuButton existingCategories={categories.map((c) => c.name)} variant={hasCategories ? "secondary" : "primary"} />
+              <Button onClick={() => setAdding(true)} className="px-5 py-2.5" variant={hasCategories ? "primary" : "secondary"}>
+                {tab === "items" && hasCategories ? "Add an item" : "Add a category"}
+              </Button>
+            </div>
           )}
         </div>
 

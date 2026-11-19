@@ -153,3 +153,12 @@ Claude không tự quyết các điểm sau, phải hỏi chủ dự án:
 8. Bật/tắt trang và kiểm tra trên điện thoại.
 
 Mỗi bước: làm, chạy thử, rồi mới sang bước sau.
+
+---
+
+## AI dùng chung với Skipli Content
+
+Repo này dùng chung AI với dự án `skipli-content-skills` (Gemini, Groq, GoClaw gateway).
+Trước khi viết code gọi AI hoặc đọc ảnh menu, đọc skill `.claude/skills/skipli-ai/SKILL.md`.
+Code có sẵn: `src/lib/ai/menu-vision.ts` (đọc ảnh menu ra danh mục, món, giá) và `src/lib/ai/goclaw.ts`.
+Không thêm nhà cung cấp AI mới khi chưa hỏi. Key chỉ nằm trong `.env` và Vercel, không ghi vào code.

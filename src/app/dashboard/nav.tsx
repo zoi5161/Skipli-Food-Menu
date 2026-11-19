@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/menu", label: "Menu" },
+  { href: "/dashboard/stats", label: "Stats" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export function DashboardNav({ variant }: { variant: "sidebar" | "tabs" }) {

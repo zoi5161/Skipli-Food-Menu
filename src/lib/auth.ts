@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { loginEmail, sendEmail } from "@/lib/email";
 
 // Đăng nhập bằng link gửi qua email (không mật khẩu).
 // - Link chỉ dùng được 1 lần, hết hạn sau 15 phút.
@@ -30,8 +31,8 @@ function appUrl() {
 }
 
 /**
- * Tạo link đăng nhập cho email. Trả về link (để màn hình dev hiện ra);
- * ở bản chạy thật, link chỉ được gửi qua email (Phase 6).
+ * Tạo link đăng nhập và gửi qua email. Trả về link để màn hình hiện ra khi chạy trên máy;
+ * ở bản chạy thật, link chỉ nằm trong email.
  */
 export async function createLoginLink(
   rawEmail: string,
@@ -54,15 +55,14 @@ export async function createLoginLink(
   });
 
   const link = `${appUrl()}/auth/verify?token=${encodeURIComponent(token)}`;
-  await sendLoginEmail(email, link);
-  return { ok: true, link };
-}
-
-async function sendLoginEmail(email: string, link: string) {
-  // TODO Phase 6: gửi email thật (Resend). Hiện chỉ in ra terminal khi chạy trên máy.
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`\n[login] Sign-in link for ${email}:\n${link}\n`);
+  if (process.env.NODE_ENV !== "production") console.log(`\n[login] Sign-in link for ${email}:\n${link}\n`);
+  const sent = await sendEmail({ to: email, ...loginEmail(link, LOGIN_TOKEN_MINUTES) });
+  if (!sent.ok) {
+    // Gửi không được thì xóa link (để không tính vào giới hạn 5 link / 15 phút)
+    await db.loginToken.deleteMany({ where: { tokenHash: hashToken(token) } });
+    return { ok: false, error: "We couldn't send the email right now. Please try again in a minute." };
   }
+  return { ok: true, link };
 }
 
 /** Dùng link đăng nhập: đánh dấu đã dùng, tạo tài khoản nếu chưa có, tạo phiên và đặt cookie. */

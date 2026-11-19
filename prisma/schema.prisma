@@ -52,6 +52,12 @@ enum Plan {
   PRO
 }
 
+// Kiểu trang menu khách thấy. Thêm template mới: thêm giá trị ở đây + một giao diện trong src/components/public-menu/styles/.
+enum MenuStyle {
+  PHOTO // có ảnh, thẻ món hiện đại (giống 1FoodMenu)
+  CLASSIC // kiểu chữ như menu giấy: tên món ..... giá
+}
+
 enum ContactButton {
   NONE
   CUSTOM_LINK
@@ -73,10 +79,12 @@ model Restaurant {
   currency    String  @default("USD")
 
   // Ảnh (để trống khi chưa có kho ảnh)
-  logoUrl  String?
-  coverUrl String?
+  logoUrl     String?
+  coverUrl    String?
+  galleryUrls String[] @default([]) // tối đa 6 ảnh giới thiệu quán
 
-  accentColor String @default("#1f4fae")
+  accentColor String    @default("#1f4fae")
+  menuStyle   MenuStyle @default(PHOTO)
 
   // Địa chỉ
   addressLine   String?
@@ -84,6 +92,13 @@ model Restaurant {
   region        String? // bang
   postalCode    String?
   googleMapsUrl String?
+  addressNote   String? // ví dụ "Cửa vào ở đường Court, đỗ xe sau 6 giờ tối"
+
+  // Giờ mở cửa: mảng 7 phần tử (0 = Chủ nhật … 6 = Thứ bảy), mỗi phần tử
+  // { closed: boolean, from: "HH:MM", until: "HH:MM" }. Để trống = chưa nhập giờ.
+  openingHours Json?
+  // Múi giờ của quán: thống kê theo ngày/giờ tính theo giờ địa phương của quán
+  timeZone     String  @default("America/New_York")
 
   // Nút liên hệ: để trống nghĩa là tắt
   customLinkLabel String?
@@ -109,6 +124,9 @@ model Restaurant {
   items      MenuItem[]
   extras     Extra[]
   allergens  Allergen[]
+  pageViews  PageView[]
+  itemClicks ItemClick[]
+  menuReads  AiMenuRead[]
 
   @@index([ownerId])
 }
@@ -158,18 +176,34 @@ model MenuItem {
   position     Int          @default(0)
   isVisible    Boolean      @default(true)
   isSoldOut    Boolean      @default(false)
+  isFeatured   Boolean      @default(false) // "Chef's pick": hiện ở đầu trang
   dietaryTags  DietaryTag[] @default([])
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   extras    MenuItemExtra[]
   allergens MenuItemAllergen[]
+  clicks    ItemClick[]
+  // Giá theo cỡ (Small/Large, Glass/Bottle…). Có cỡ thì priceCents = giá thấp nhất (để sắp xếp, "from $x").
+  variants  ItemVariant[]
 
   @@index([restaurantId])
   @@index([categoryId, position])
 }
 
 // Món thêm có giá (thêm phô mai, thêm sốt...)
+/// Một cỡ / lựa chọn của món, có giá riêng. Tối đa 6 cỡ mỗi món.
+model ItemVariant {
+  id         String   @id @default(cuid())
+  itemId     String
+  item       MenuItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  name       String
+  priceCents Int
+  position   Int      @default(0)
+
+  @@index([itemId, position])
+}
+
 model Extra {
   id           String          @id @default(cuid())
   restaurantId String
@@ -210,4 +244,79 @@ model MenuItemAllergen {
   allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Cascade)
 
   @@id([itemId, allergenId])
+}
+
+// ── Thống kê (Phase 4) ─────────────────────────────────
+// Không lưu IP. "visitorHash" = mã băm của (muối trong ngày + quán + IP + trình duyệt).
+// Muối đổi mỗi ngày và bị xóa sau 2 ngày, nên không thể nối một người qua nhiều ngày,
+// chỉ đếm được "bao nhiêu khách khác nhau trong ngày".
+
+enum TrafficSource {
+  QR
+  DIRECT // gõ link, tin nhắn (WhatsApp, iMessage…), app không gửi nguồn
+  INSTAGRAM
+  FACEBOOK
+  GOOGLE
+  OTHER // trang web khác (ghi tên miền ở referrerHost)
+}
+
+enum DeviceType {
+  MOBILE
+  TABLET
+  DESKTOP
+}
+
+model PageView {
+  id           String        @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  visitorHash  String
+  source       TrafficSource
+  referrerHost String?
+  device       DeviceType
+  // Vị trí: chỉ cấp thành phố / bang / quốc gia (lấy từ máy chủ hosting, không tự định vị)
+  city         String?
+  region       String?
+  country      String?
+  // Tọa độ gần đúng của thành phố (theo nhà mạng, không phải GPS), làm tròn 1 chữ số thập phân (~10 km)
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime      @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([restaurantId, visitorHash, createdAt])
+}
+
+model ItemClick {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  itemId       String
+  item         MenuItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  visitorHash  String
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([itemId, visitorHash, createdAt])
+  @@index([restaurantId, visitorHash, createdAt])
+}
+
+/// Muối của từng ngày (giờ UTC) để băm mã khách. Xóa sau 2 ngày.
+model DailySalt {
+  day       String   @id // "2026-11-19"
+  salt      String
+  createdAt DateTime @default(now())
+}
+
+/// Mỗi lần dùng AI đọc ảnh menu (để giới hạn số lần mỗi ngày: key AI dùng chung hạn mức với Skipli Content).
+model AiMenuRead {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ok           Boolean
+  engine       String? // "gemini" | "groq"
+  dishes       Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
 }

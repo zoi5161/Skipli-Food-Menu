@@ -3,13 +3,13 @@
 // Các thao tác sửa menu. Mọi hàm đều:
 // 1) kiểm tra đăng nhập và lấy quán của người đó (không tin restaurantId gửi từ trình duyệt),
 // 2) chỉ sửa dữ liệu thuộc quán đó,
-// 3) gọi refresh() để màn hình cập nhật.
+// 3) xóa bản lưu đệm của trang khách và làm mới màn hình (expireRestaurantCache).
 
-import { refresh } from "next/cache";
+import { expireRestaurantCache } from "@/lib/menu/expire";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRestaurant } from "@/lib/restaurant";
-import { DIETARY_TAGS, parsePriceInput } from "@/lib/menu/format";
+import { DIETARY_TAGS, MAX_VARIANTS, parsePriceInput } from "@/lib/menu/format";
 
 export type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -97,7 +97,7 @@ export async function saveCategory(input: z.input<typeof categoryInput>): Promis
       });
       savedId = created.id;
     }
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true, id: savedId };
   } catch (e) {
     return fail(e);
@@ -109,7 +109,7 @@ export async function setCategoryVisible(categoryId: string, isVisible: boolean)
     const { restaurant } = await requireRestaurant();
     await assertOwned("category", restaurant.id, [id.parse(categoryId)]);
     await db.category.update({ where: { id: categoryId }, data: { isVisible: z.boolean().parse(isVisible) } });
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -121,7 +121,7 @@ export async function deleteCategory(categoryId: string): Promise<ActionResult> 
     const { restaurant } = await requireRestaurant();
     await assertOwned("category", restaurant.id, [id.parse(categoryId)]);
     await db.category.delete({ where: { id: categoryId } }); // món trong danh mục bị xóa theo
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -141,13 +141,27 @@ const itemInput = z.object({
   allergenIds: z.array(id).max(100).default([]),
   isVisible: z.boolean().default(true),
   isSoldOut: z.boolean().default(false),
+  isFeatured: z.boolean().default(false),
+  // Giá theo cỡ: để trống = một giá (dùng "price"); có thì cần 2–6 cỡ, mỗi cỡ có tên và giá
+  variants: z
+    .array(z.object({ name: z.string().trim().min(1, "Each size needs a name").max(30, "Size names: keep them under 30 characters"), price: z.string().max(20) }))
+    .max(MAX_VARIANTS, `Up to ${MAX_VARIANTS} sizes per item`)
+    .default([]),
 });
 
 export async function saveItem(input: z.input<typeof itemInput>): Promise<ActionResult> {
   try {
     const { restaurant } = await requireRestaurant();
     const data = itemInput.parse(input);
-    const priceCents = priceOrThrow(data.price);
+    if (data.variants.length === 1) throw new Error("USER:Add at least 2 sizes, or remove sizes and use one price");
+    if (new Set(data.variants.map((v) => v.name.toLowerCase())).size !== data.variants.length) throw new Error("USER:Each size needs a different name");
+    const variants = data.variants.map((v, position) => {
+      const cents = priceOrThrow(v.price);
+      if (cents === null) throw new Error(`USER:Enter a price for “${v.name}”`);
+      return { name: v.name, priceCents: cents, position };
+    });
+    // Có cỡ thì giá chính = giá thấp nhất (dùng cho "from $x")
+    const priceCents = variants.length ? Math.min(...variants.map((v) => v.priceCents)) : priceOrThrow(data.price);
     const extraIds = [...new Set(data.extraIds)];
     const allergenIds = [...new Set(data.allergenIds)];
     await assertOwned("category", restaurant.id, [data.categoryId]);
@@ -161,6 +175,7 @@ export async function saveItem(input: z.input<typeof itemInput>): Promise<Action
       dietaryTags: [...new Set(data.dietaryTags)],
       isVisible: data.isVisible,
       isSoldOut: data.isSoldOut,
+      isFeatured: data.isFeatured,
     };
 
     let savedId: string;
@@ -176,6 +191,8 @@ export async function saveItem(input: z.input<typeof itemInput>): Promise<Action
         }),
         db.menuItemExtra.deleteMany({ where: { itemId: data.id } }),
         db.menuItemAllergen.deleteMany({ where: { itemId: data.id } }),
+        db.itemVariant.deleteMany({ where: { itemId: data.id } }),
+        db.itemVariant.createMany({ data: variants.map((v) => ({ ...v, itemId: data.id! })) }),
         db.menuItemExtra.createMany({ data: extraIds.map((extraId) => ({ itemId: data.id!, extraId })) }),
         db.menuItemAllergen.createMany({ data: allergenIds.map((allergenId) => ({ itemId: data.id!, allergenId })) }),
       ]);
@@ -189,11 +206,12 @@ export async function saveItem(input: z.input<typeof itemInput>): Promise<Action
           position: await nextItemPosition(data.categoryId),
           extras: { create: extraIds.map((extraId) => ({ extraId })) },
           allergens: { create: allergenIds.map((allergenId) => ({ allergenId })) },
+          variants: { create: variants },
         },
       });
       savedId = created.id;
     }
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true, id: savedId };
   } catch (e) {
     return fail(e);
@@ -210,9 +228,10 @@ export async function setItemPrice(itemId: string, price: string): Promise<Actio
   try {
     const { restaurant } = await requireRestaurant();
     await assertOwned("menuItem", restaurant.id, [id.parse(itemId)]);
+    if (await db.itemVariant.count({ where: { itemId } })) throw new Error("USER:This item has sizes. Open it to change each price.");
     const priceCents = priceOrThrow(z.string().max(20).parse(price));
     await db.menuItem.update({ where: { id: itemId }, data: { priceCents } });
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -229,7 +248,7 @@ export async function setItemFlags(
     await assertOwned("menuItem", restaurant.id, [id.parse(itemId)]);
     const data = z.object({ isSoldOut: z.boolean().optional(), isVisible: z.boolean().optional() }).parse(flags);
     await db.menuItem.update({ where: { id: itemId }, data });
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -241,7 +260,7 @@ export async function deleteItem(itemId: string): Promise<ActionResult> {
     const { restaurant } = await requireRestaurant();
     await assertOwned("menuItem", restaurant.id, [id.parse(itemId)]);
     await db.menuItem.delete({ where: { id: itemId } });
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -273,7 +292,7 @@ export async function saveExtra(input: z.input<typeof extraInput>): Promise<Acti
       });
       savedId = created.id;
     }
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true, id: savedId };
   } catch (e) {
     return fail(e);
@@ -285,7 +304,7 @@ export async function deleteExtra(extraId: string): Promise<ActionResult> {
     const { restaurant } = await requireRestaurant();
     await assertOwned("extra", restaurant.id, [id.parse(extraId)]);
     await db.extra.delete({ where: { id: extraId } });
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -315,7 +334,7 @@ export async function saveAllergen(input: z.input<typeof allergenInput>): Promis
       });
       savedId = created.id;
     }
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true, id: savedId };
   } catch (e) {
     return fail(e);
@@ -327,7 +346,7 @@ export async function deleteAllergen(allergenId: string): Promise<ActionResult> 
     const { restaurant } = await requireRestaurant();
     await assertOwned("allergen", restaurant.id, [id.parse(allergenId)]);
     await db.allergen.delete({ where: { id: allergenId } });
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -362,8 +381,89 @@ export async function reorder(
       }
     });
     await db.$transaction(updates);
-    refresh();
+    expireRestaurantCache(restaurant);
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ──────────────────── Nhập menu từ ảnh (sau khi chủ quán xem lại) ────────────────────
+
+const importInput = z.object({
+  categories: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1, "Each category needs a name").max(60),
+        items: z
+          .array(
+            z.object({
+              name: z.string().trim().min(1, "Each dish needs a name").max(80),
+              description: z.string().trim().max(500).nullable(),
+              priceCents: z.number().int().min(0).max(10_000_000).nullable(),
+              variants: z
+                .array(z.object({ name: z.string().trim().min(1).max(30), priceCents: z.number().int().min(0).max(10_000_000) }))
+                .max(MAX_VARIANTS)
+                .default([]),
+            }),
+          )
+          .max(150),
+      }),
+    )
+    .max(30),
+});
+
+/**
+ * Lưu các món AI đọc được (chủ quán đã xem lại, sửa, bỏ món sai).
+ * Món vào danh mục cùng tên nếu đã có (không phân biệt hoa thường), nếu chưa thì tạo danh mục mới.
+ * Lưu tất cả trong một lần: lỗi thì không lưu món nào.
+ */
+export async function importMenu(input: z.input<typeof importInput>): Promise<ActionResult & { added?: number; newCategories?: number }> {
+  try {
+    const { restaurant } = await requireRestaurant();
+    const data = importInput.parse(input);
+    const total = data.categories.reduce((n, c) => n + c.items.length, 0);
+    if (total === 0) throw new Error("USER:Choose at least one dish to add");
+    if (total > 150) throw new Error("USER:Add up to 150 dishes at a time");
+
+    const result = await db.$transaction(async (tx) => {
+      const existing = await tx.category.findMany({ where: { restaurantId: restaurant.id }, select: { id: true, name: true, position: true } });
+      const byName = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c.id]));
+      let nextCatPos = existing.reduce((m, c) => Math.max(m, c.position), -1) + 1;
+      let added = 0;
+      let newCategories = 0;
+      for (const cat of data.categories) {
+        if (cat.items.length === 0) continue;
+        let categoryId = byName.get(cat.name.toLowerCase());
+        if (!categoryId) {
+          categoryId = (await tx.category.create({ data: { restaurantId: restaurant.id, name: cat.name, position: nextCatPos++ } })).id;
+          byName.set(cat.name.toLowerCase(), categoryId);
+          newCategories++;
+        }
+        const last = await tx.menuItem.aggregate({ where: { categoryId }, _max: { position: true } });
+        let pos = (last._max.position ?? -1) + 1;
+        for (const it of cat.items) {
+          // Cỡ: cần ít nhất 2; chỉ 1 cỡ thì coi như một giá
+          const variants = it.variants.length >= 2 ? it.variants : [];
+          const priceCents = variants.length ? Math.min(...variants.map((v) => v.priceCents)) : (it.variants[0]?.priceCents ?? it.priceCents);
+          await tx.menuItem.create({
+            data: {
+              restaurantId: restaurant.id,
+              categoryId,
+              name: it.name,
+              description: it.description || null,
+              priceCents,
+              position: pos++,
+              variants: { create: variants.map((v, i) => ({ name: v.name, priceCents: v.priceCents, position: i })) },
+            },
+          });
+          added++;
+        }
+      }
+      return { added, newCategories };
+    });
+    expireRestaurantCache(restaurant);
+    return { ok: true, ...result };
   } catch (e) {
     return fail(e);
   }

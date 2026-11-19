@@ -8,7 +8,9 @@ export default defineConfig({
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
+  // Lệnh migrate cần kết nối trực tiếp (Neon: link "direct", không qua pooler).
+  // Không có DIRECT_URL thì dùng DATABASE_URL (chạy trên máy).
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DIRECT_URL"] || process.env["DATABASE_URL"],
   },
 });
