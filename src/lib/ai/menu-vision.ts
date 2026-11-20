@@ -7,7 +7,10 @@
 //
 // Chép từ ~/Downloads/skipli-ai-kit/lib/menu-vision.ts. Sửa trong repo này:
 // - biến môi trường để trống ("") thì dùng mặc định (bản gốc dùng ?? nên "" làm danh sách model Gemini rỗng);
-// - đọc biến môi trường lúc gọi hàm (không phải lúc nạp file) để đổi được khi chạy và khi test.
+// - đọc biến môi trường lúc gọi hàm (không phải lúc nạp file) để đổi được khi chạy và khi test;
+// - giới hạn thời gian: mỗi model Gemini tối đa 25 s, cả lượt Gemini tối đa 40 s, rồi sang model kế / Groq.
+//   (Thử thật 20-11-2026: gemini-flash-latest báo 503 sau 5 s, gemini-3.8-flash treo hơn 70 s,
+//   flash-lite trả lời trong 4 s, Groq 2 s. Bản kit chờ 60 s mỗi model nên chủ quán có thể chờ vài phút.)
 import "server-only";
 
 export type ReadMenuVariant = { name: string; priceCents: number };
@@ -15,10 +18,15 @@ export type ReadMenuItem = { name: string; description: string | null; priceCent
 export type ReadMenuCategory = { name: string; items: ReadMenuItem[] };
 export type ReadMenuResult = { categories: ReadMenuCategory[]; engine: "gemini" | "groq" };
 
-const DEFAULT_GEMINI_MODELS = "gemini-flash-latest,gemini-3.8-flash,gemini-flash-lite-latest";
+// Thứ tự: flash (tốt nhất, hay quá tải) → flash-lite (nhanh, ổn định) → 3.8-flash (hay treo khi thử thật).
+// Bản kit để 3.8-flash thứ hai. Muốn đổi thì đặt GEMINI_IMAGE_MODELS trong .env.
+const DEFAULT_GEMINI_MODELS = "gemini-flash-latest,gemini-flash-lite-latest,gemini-3.8-flash";
 const geminiModels = () => (process.env.GEMINI_IMAGE_MODELS || DEFAULT_GEMINI_MODELS).split(",").map((m) => m.trim()).filter(Boolean);
 const groqVisionModel = () => process.env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b";
 const GROQ_MAX_BASE64 = 4_000_000; // Groq refuses base64 images over 4 MB
+const GEMINI_MODEL_TIMEOUT_MS = 25_000;
+const GEMINI_TOTAL_MS = 40_000;
+const GROQ_TIMEOUT_MS = 30_000;
 export const MENU_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
 const MAX_ITEMS = 150;
 
@@ -48,7 +56,11 @@ export class MenuReadError extends Error {
  */
 export async function readMenuPhoto(
   { bytes, mime }: { bytes: Uint8Array | ArrayBuffer; mime: string },
-  { signal, fetchFn = fetch }: { signal?: AbortSignal; fetchFn?: typeof fetch } = {},
+  {
+    signal,
+    fetchFn = fetch,
+    timeouts = {},
+  }: { signal?: AbortSignal; fetchFn?: typeof fetch; timeouts?: { geminiModelMs?: number; geminiTotalMs?: number; groqMs?: number } } = {},
 ): Promise<ReadMenuResult> {
   const gemini = process.env.GEMINI_API_KEY;
   const groq = process.env.GROQ_API_KEY;
@@ -57,7 +69,11 @@ export async function readMenuPhoto(
   const base64 = Buffer.from(bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes).toString("base64");
 
   let answered = false;
+  const modelMs = timeouts.geminiModelMs ?? GEMINI_MODEL_TIMEOUT_MS;
+  const geminiDeadline = Date.now() + (timeouts.geminiTotalMs ?? GEMINI_TOTAL_MS);
   for (const model of gemini ? geminiModels() : []) {
+    const budget = Math.min(modelMs, geminiDeadline - Date.now());
+    if (budget < Math.min(3_000, modelMs)) break; // hết thời gian cho Gemini: sang Groq
     try {
       const res = await fetchFn(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
@@ -67,7 +83,7 @@ export async function readMenuPhoto(
           contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: base64 } }, { text: MENU_PROMPT }] }],
           generationConfig: { maxOutputTokens: 8000, temperature: 0, responseMimeType: "application/json" },
         }),
-        signal: anySignal(signal, 60_000),
+        signal: anySignal(signal, budget),
       });
       if (!res.ok) continue; // 429 / 503: the next model or Groq takes over
       answered = true;
@@ -93,7 +109,7 @@ export async function readMenuPhoto(
           reasoning_effort: "none",
           messages: [{ role: "user", content: [{ type: "text", text: MENU_PROMPT }, { type: "image_url", image_url: { url: `data:${mime};base64,${base64}` } }] }],
         }),
-        signal: anySignal(signal, 60_000),
+        signal: anySignal(signal, timeouts.groqMs ?? GROQ_TIMEOUT_MS),
       });
       if (res.ok) {
         const text = String((await res.json()).choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "");

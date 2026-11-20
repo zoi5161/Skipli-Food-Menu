@@ -1,4 +1,4 @@
-import { DIETARY_LABEL } from "@/lib/menu/format";
+import { DIETARY_LABEL, priceDisplay } from "@/lib/menu/format";
 import { formatDayHours, DAY_NAMES, WEEK_FROM_MONDAY } from "@/lib/menu/hours";
 import { RichText } from "@/lib/menu/rich-text";
 import { ContactButton } from "../contact-button";
@@ -72,6 +72,10 @@ function CategoryHeading({ category: c, serving }: CategoryHeadingProps) {
 
 function ItemRow({ item, currency, onOpen }: ItemRowProps) {
   const notes = item.dietaryTags.map((t) => DIETARY_LABEL[t]);
+  // Giá theo cỡ ("Regular $13.50 / Large $15.50") dài, không vừa cùng dòng với tên món trên điện thoại:
+  // để trên dòng riêng dưới tên món, giống menu giấy.
+  const sizesBelow = priceDisplay(item.priceCents, item.variants, currency)?.kind === "sizes";
+  const price = <PriceText priceCents={item.priceCents} variants={item.variants} currency={currency} separator=" / " nameClass="font-sans text-sm font-normal opacity-70" />;
   return (
     <button type="button" onClick={onOpen} className={`group block w-full py-4 text-left ${item.isSoldOut ? "opacity-55" : ""}`}>
       {/* Tên món ……… giá */}
@@ -80,15 +84,14 @@ function ItemRow({ item, currency, onOpen }: ItemRowProps) {
           <span className={item.isSoldOut ? "line-through decoration-1" : ""}>{item.name}</span>
           {item.allergenCodes.length > 0 && <sup className="ml-1 font-sans text-[10px] font-normal opacity-60">{item.allergenCodes.join(",")}</sup>}
         </span>
-        {item.priceCents !== null && (
+        {item.priceCents !== null && !sizesBelow && (
           <>
             <span className="min-w-6 flex-1 -translate-y-1 border-b-2 border-dotted opacity-30" aria-hidden />
-            <span className="shrink-0 text-xl font-semibold tabular-nums">
-              <PriceText priceCents={item.priceCents} variants={item.variants} currency={currency} separator=" / " nameClass="font-sans text-sm font-normal opacity-70" />
-            </span>
+            <span className="shrink-0 text-xl font-semibold tabular-nums">{price}</span>
           </>
         )}
       </span>
+      {sizesBelow && <span className="mt-0.5 block text-lg font-semibold tabular-nums">{price}</span>}
       {item.description && <span className="mt-1 block pr-12 font-sans text-[15px] leading-snug opacity-75">{item.description}</span>}
       {(item.isSoldOut || item.isFeatured || notes.length > 0) && (
         <span className="mt-1.5 flex flex-wrap gap-1.5 font-sans text-[11px] font-semibold tracking-wide uppercase">
@@ -113,7 +116,7 @@ export const classicStyle: StyleKit = {
     tab: "font-sans text-[15px] font-semibold opacity-60 hover:opacity-100 aria-[current=true]:opacity-100",
     chip: "rounded-full font-sans",
     input: "rounded-md border border-[#ddd3c3] bg-[#fbf8f2] font-sans focus-within:ring-2 focus-within:ring-[#ddd3c3]",
-    itemGrid: "md:grid-cols-2 md:gap-x-14",
+    itemGrid: "grid-cols-1 md:grid-cols-2 md:gap-x-14",
     panel: "rounded-md border border-[#ddd3c3] bg-[#fbf8f2]",
     sectionTitle: "text-3xl font-medium sm:text-4xl",
     muted: "opacity-75",

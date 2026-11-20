@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // Link công khai của quán là /@ten-quan. Next không cho thư mục bắt đầu bằng "@"
   // (ký hiệu đó dành cho "parallel routes"), nên chuyển ngầm sang /m/ten-quan.
   // Header bảo mật cho mọi trang. Trang menu khách (/m/…) được phép nhúng vào website của quán (iframe);
-  // các trang khác (đăng nhập, quản lý) thì không, để chống lừa bấm (clickjacking).
+  // các trang khác (đăng nhập, quản lý) thì không, để chống lừa bấm (clickjacking). Trang /preview chỉ nhúng được trong chính app.
   async headers() {
     const common = [
       { key: "X-Content-Type-Options", value: "nosniff" },
@@ -15,7 +15,9 @@ const nextConfig: NextConfig = {
     ];
     return [
       { source: "/:path*", headers: common },
-      { source: "/((?!m/|@).*)", headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }] },
+      { source: "/((?!m/|@|preview).*)", headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }] },
+      // Trang xem trước của chủ quán: chỉ cho nhúng trong chính app (khung xem thử ở Settings → Design)
+      { source: "/preview", headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'self'" }] },
     ];
   },
   async rewrites() {

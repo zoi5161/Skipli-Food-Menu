@@ -14,7 +14,7 @@ import { styleKit } from "./styles";
 export function MenuView({ menu, track = false }: { menu: PublicMenu; track?: boolean }) {
   const r = menu.restaurant;
   const kit = styleKit(r.menuStyle);
-  const accent = isHexColor(r.accentColor) ? r.accentColor : "#1f4fae";
+  const accent = kit.monochrome ? "#111111" : isHexColor(r.accentColor) ? r.accentColor : "#1f4fae";
   const style = { "--accent": accent, "--on-accent": readableTextOn(accent), "--line": kit.theme.line } as CSSProperties;
 
   return (

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectToast, signIn, uniqueEmail } from "./helpers";
+import { applyMenuStyle, expectToast, signIn, uniqueEmail } from "./helpers";
 
 // Giá theo cỡ: chủ quán nhập Small/Large…, khách thấy "Glass $x · Bottle $y" hoặc "from $x".
 
@@ -76,20 +76,11 @@ test("giá theo cỡ: nhập, kiểm tra lỗi, khách thấy đúng, bỏ cỡ 
 
 test("quán demo: kiểu Classic hiện cỡ dạng 'Glass / Pitcher'", async ({ page }) => {
   await signIn(page, "demo@example.com");
-  await page.goto("/dashboard/settings?tab=design");
-  await page.waitForLoadState("networkidle");
   try {
-    await page.getByRole("radio", { name: /^Classic/ }).click();
-    await expectToast(page, "Classic style is on your page");
+    await applyMenuStyle(page, "Classic");
     await page.goto("/@lantern-and-ladle");
     await expect(page.getByRole("region", { name: "Drinks" }).getByRole("button", { name: /Fresh Lemonade/ })).toContainText("Glass $4.50 / Pitcher $14.00");
   } finally {
-    await page.goto("/dashboard/settings?tab=design");
-    await page.waitForLoadState("networkidle");
-    const modern = page.getByRole("radio", { name: /^Modern/ });
-    if ((await modern.getAttribute("aria-checked")) !== "true") {
-      await modern.click();
-      await expectToast(page, "Modern style is on your page");
-    }
+    await applyMenuStyle(page, "Modern");
   }
 });

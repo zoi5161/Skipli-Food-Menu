@@ -58,17 +58,30 @@
 
 - Gửi email đăng nhập thật qua Resend (email có nút đăng nhập, link dùng 1 lần, hết hạn 15 phút); cấu hình sẵn cho Vercel + Neon (tự cập nhật database khi đưa code mới lên), dọn dữ liệu cũ mỗi ngày, thêm các lớp bảo mật cho trang.
 - Chạy thử tải bản chạy thật trên máy: 50 khách cùng lúc mở menu, 0 lỗi, khoảng 145 lượt mở trang mỗi giây trên một máy; ghi lượt xem khoảng 850 lần mỗi giây, trả lời trong khoảng 0,03 giây. Trang menu nặng khoảng 20 KB.
-- Viết hướng dẫn từng bước tạo tài khoản và đưa app lên mạng (docs/trien-khai.md). Còn lại: kho ảnh online (Vercel Blob) trước khi có quán thật.
+- Viết hướng dẫn từng bước tạo tài khoản và đưa app lên mạng (docs/trien-khai.md).
 - Kho ảnh theo chuẩn S3 (đề xuất Cloudflare R2: không tính tiền gửi ảnh cho khách); đổi sang Backblaze B2 hay Amazon S3 chỉ cần đổi khóa. Đã chạy thử toàn bộ với một kho S3 giả lập trên máy: tải ảnh, xóa ảnh, trang khách hiện ảnh đúng.
 
-## Giá theo cỡ (21-11-2026)
+## Giá theo cỡ (23-11-2026)
 
 - Món có thể có nhiều cỡ với giá riêng (Small / Large, Glass / Bottle, 6 / 12 miếng…, tối đa 6 cỡ). Chủ quán bật "Sizes" trong form món; nhập thiếu tên, thiếu giá hay trùng tên thì báo ngay.
 - Trang khách: 2 cỡ hiện từng giá ("Glass $4.50 · Pitcher $14.00", kiểu Classic dùng dấu "/"), nhiều cỡ hơn hiện "from $3.50"; bấm vào món thấy bảng giá từng cỡ. Danh sách món của chủ quán hiện "from $x".
 - Quán demo có món theo cỡ: Pancakes, Lemonade, Cold Brew, Hibiscus Tea.
 
-## Nhập menu từ ảnh và logo (21-11-2026)
+## Nhập menu từ ảnh và logo (23-11-2026)
 
 - Nút "Scan paper menu" trong trang Menu: chủ quán chụp hoặc chọn ảnh menu giấy (tối đa 4 trang), AI đọc ra danh mục, món, giá và giá theo cỡ; chủ quán xem lại, sửa tên/giá, bỏ món sai rồi mới thêm vào menu. Món vào đúng danh mục cùng tên nếu đã có.
-- Dùng AI chung với Skipli Content theo bộ kit (Gemini, quá tải thì chuyển Groq; không qua GoClaw). Giới hạn 30 lần đọc mỗi quán mỗi ngày để giữ hạn mức miễn phí. Còn chờ chép key AI vào .env để chạy thật.
+- Dùng AI chung với Skipli Content theo bộ kit (Gemini, quá tải thì chuyển Groq; không qua GoClaw). Giới hạn 30 lần đọc mỗi quán mỗi ngày để giữ hạn mức miễn phí.
 - Gắn logo Skipli: icon tab trình duyệt, đầu trang quản lý, trang đăng nhập, trang chủ, email đăng nhập, dòng "Made with" cuối menu.
+- Chạy thử AI thật với ảnh menu quán phở mẫu: đọc đúng 9/9 món, giá, giá theo cỡ (Regular / Large), mô tả và dấu tiếng Việt; từ lúc chọn ảnh đến lúc hiện màn hình xem lại khoảng 30 giây. Đã giới hạn thời gian chờ mỗi model AI để chủ quán không phải chờ lâu khi một model bị treo.
+
+## Thêm 4 quán demo (23-11-2026)
+
+- Thêm 4 quán giả theo loại quán phổ biến ở Mỹ, mỗi quán có ảnh món, logo, giờ mở cửa, giá theo cỡ và số liệu thống kê 90 ngày: **Casa Lupita Taqueria** (taco Mexico, San Antonio), **Pho Saigon Corner** (phở, Little Saigon California, kiểu menu Classic), **Brick Oven Pizza Co.** (pizza, Brooklyn), **Morning Grind Café** (cà phê, Denver).
+- Mỗi quán có một tài khoản riêng để thử trang quản lý (danh sách trong README). Dữ liệu demo gom vào một file, thêm quán mới chỉ cần thêm một khối dữ liệu.
+- Sửa kiểu menu Classic: món có nhiều cỡ (Regular / Large) hiện giá trên dòng riêng dưới tên món, không còn tràn khỏi màn hình điện thoại.
+
+## 6 kiểu menu cho chủ quán chọn (23-11-2026)
+
+- Thêm 4 kiểu menu mới, tổng cộng 6 kiểu: **Modern**, **Classic**, **Bold** (chữ to đậm, giá trong ô màu, hợp quán taco/food truck), **Grid** (lưới ảnh 2 cột kiểu Instagram, hợp cafe/tiệm bánh), **Dark** (nền tối sang trọng, hợp pizza/bar), **Simple** (chữ đen trắng cỡ lớn, không cần ảnh, giống menu chữ của SinglePlatform). Mỗi kiểu ghi rõ "hợp với loại quán nào".
+- Settings → Design có khung điện thoại **xem thử ngay menu thật của quán** với kiểu và màu đang chọn; khách vẫn thấy kiểu cũ cho tới khi chủ quán bấm "Use this style". Trên điện thoại có nút xem toàn màn hình.
+- Các quán demo dùng mỗi quán một kiểu để demo ngay: taco (Bold), phở (Classic), pizza (Dark), cafe (Grid). Đã kiểm tra cả 6 kiểu trên điện thoại và máy tính: đủ món, mở chi tiết món, không tràn màn hình.

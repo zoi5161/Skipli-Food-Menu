@@ -94,6 +94,21 @@ describe("readMenuPhoto", () => {
     expect(JSON.parse(fetchFn.mock.calls[2][1].body).model).toBe("qwen/qwen3.8-27b");
   });
 
+  it("model treo (không trả lời) thì bỏ sau thời gian chờ, chuyển model kế", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "g");
+    vi.stubEnv("GEMINI_IMAGE_MODELS", "slow,fast");
+    vi.stubEnv("GROQ_API_KEY", "");
+    // Model "slow" chỉ dừng khi bị hủy (giống gemini-3.8-flash treo khi thử thật)
+    const hang = (_url: string, init: RequestInit) =>
+      new Promise<Response>((_, reject) => init.signal?.addEventListener("abort", () => reject(new DOMException("timeout", "TimeoutError"))));
+    const fetchFn = vi.fn((url: string, init: RequestInit) => (url.includes("/models/slow:") ? hang(url, init) : Promise.resolve(geminiReply(PHO_MENU))));
+    const t0 = Date.now();
+    const r = await readMenuPhoto(img, { fetchFn: fetchFn as unknown as typeof fetch, timeouts: { geminiModelMs: 200, geminiTotalMs: 2000 } });
+    expect(r.categories[0].items).toHaveLength(2);
+    expect(Date.now() - t0).toBeLessThan(1500);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it("không AI nào trả lời thì báo unavailable", async () => {
     vi.stubEnv("GEMINI_API_KEY", "g");
     vi.stubEnv("GEMINI_IMAGE_MODELS", "m1");

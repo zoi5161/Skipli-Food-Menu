@@ -40,3 +40,8 @@ export function PriceText({
   }
   return <>{d.text}</>;
 }
+
+/** Giá dạng "Regular $13.50 / Large $15.50": dài, nhiều kiểu menu đặt trên dòng riêng dưới tên món. */
+export function isSizeList(priceCents: number | null, variants: Variant[], currency: string): boolean {
+  return priceDisplay(priceCents, variants, currency)?.kind === "sizes";
+}

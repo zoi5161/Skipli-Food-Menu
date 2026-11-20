@@ -56,6 +56,10 @@ enum Plan {
 enum MenuStyle {
   PHOTO // có ảnh, thẻ món hiện đại (giống 1FoodMenu)
   CLASSIC // kiểu chữ như menu giấy: tên món ..... giá
+  BOLD // chữ to đậm, giá trong ô màu (quán taco, food truck, burger)
+  GRID // lưới ảnh 2 cột kiểu Instagram (cafe, tiệm bánh)
+  DARK // nền tối, chữ có chân (pizza buổi tối, bar, nhà hàng sang)
+  SIMPLE // chữ đen trên nền trắng, cỡ lớn, không ảnh (quán lâu năm, khách lớn tuổi)
 }
 
 enum ContactButton {

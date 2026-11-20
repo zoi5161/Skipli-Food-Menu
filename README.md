@@ -40,8 +40,17 @@ npm run dev
 3. Vào **Menu** để sửa danh mục, món, giá, extra, dị ứng; vào **Settings** để sửa thông tin quán, màu, nút liên hệ, bật/tắt trang.
 4. Trang khách xem: http://localhost:3300/@lantern-and-ladle (quán demo đã bật sẵn).
 
-Quán demo "Lantern & Ladle" là quán giả, số điện thoại dạng 555 (không có thật).
-Chạy lại `npx prisma db seed` để đưa quán demo về trạng thái ban đầu.
+Có 5 quán demo, mỗi quán một tài khoản. Tất cả là quán giả, số điện thoại dạng 555 (không có thật):
+
+| Quán | Loại | Đăng nhập | Trang khách |
+|---|---|---|---|
+| Lantern & Ladle | Quán ăn cả ngày (kiểu Modern) | `demo@example.com` | `/@lantern-and-ladle` |
+| Casa Lupita Taqueria | Taco Mexico (kiểu Bold) | `demo-taqueria@example.com` | `/@casa-lupita-taqueria` |
+| Pho Saigon Corner | Phở (kiểu menu Classic) | `demo-pho@example.com` | `/@pho-saigon-corner` |
+| Brick Oven Pizza Co. | Pizza (kiểu Dark) | `demo-pizza@example.com` | `/@brick-oven-pizza-co` |
+| Morning Grind Café | Cà phê (kiểu Grid) | `demo-cafe@example.com` | `/@morning-grind-cafe` |
+
+Dữ liệu demo nằm ở `prisma/demo-data.ts`. Chạy lại `npx prisma db seed` để đưa các quán demo về trạng thái ban đầu.
 
 ## Kiểm tra tự động
 

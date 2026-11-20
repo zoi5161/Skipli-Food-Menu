@@ -54,3 +54,18 @@ export async function expectToast(page: Page, text: string | RegExp) {
 
 /** Ảnh PNG hợp lệ 40x30 (màu đỏ) dùng chung cho các bài kiểm tra tải ảnh. */
 export const SAMPLE_PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAACgAAAAeCAIAAADRv8uKAAAAQklEQVR4nO3NMQEAIBADsad2UIB7pLFSA9elMZB1z54ERdZpDBKZ/RpjxFWuMUZc5RpjxFWuMUZc5RpjxFWuMSYWP+NWAWDiCd0LAAAAAElFTkSuQmCC", "base64");
+
+export type StyleName = "Modern" | "Classic" | "Bold" | "Grid" | "Dark" | "Simple";
+
+/** Chọn kiểu menu ở Settings → Design và bấm "Use this style" (bấm vào ô chỉ để xem thử). */
+export async function applyMenuStyle(page: Page, name: StyleName) {
+  await page.goto("/dashboard/settings?tab=design");
+  await page.waitForLoadState("networkidle");
+  const option = page.getByRole("radio", { name: new RegExp(`^${name}`) });
+  if (await option.getByText("In use").isVisible()) return;
+  await option.click();
+  await expect(option).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "Use this style" }).click();
+  await expectToast(page, `${name} style is on your page`);
+  await expect(option.getByText("In use")).toBeVisible();
+}

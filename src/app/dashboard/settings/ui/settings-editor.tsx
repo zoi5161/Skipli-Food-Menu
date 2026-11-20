@@ -16,7 +16,7 @@ import { SETTINGS_TABS, SETTINGS_TAB_LABEL, type SettingsData, type SettingsTab 
 export function SettingsEditor({ data, tab }: { data: SettingsData; tab: SettingsTab }) {
   return (
     <ToastProvider>
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className={cx("mx-auto space-y-6", tab === "design" ? "max-w-6xl" : "max-w-3xl")}>
         <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
         <nav className="-mx-1 flex gap-1 overflow-x-auto px-1" aria-label="Settings sections">
           {SETTINGS_TABS.map((t) => (
@@ -375,130 +375,225 @@ function PageTab({ data }: { data: SettingsData }) {
 
 function DesignTab({ data }: { data: SettingsData }) {
   const { save, pending } = useSaver();
-  const [style, setStyle] = useState<MenuStyleKey>(data.menuStyle);
+  const [saved, setSaved] = useState<MenuStyleKey>(data.menuStyle); // kiểu khách đang thấy
+  const [style, setStyle] = useState<MenuStyleKey>(data.menuStyle); // kiểu đang xem thử
   const [color, setColor] = useState(data.accentColor);
+  const accent = isHexColor(color) ? color : data.accentColor;
+  const previewUrl = (frame: boolean) => `/preview?${new URLSearchParams({ style, accent, ...(frame ? { frame: "1" } : {}) })}`;
 
-  function pickStyle(next: MenuStyleKey) {
-    if (next === style) return;
-    const before = style;
-    setStyle(next);
+  function applyStyle() {
+    const next = style;
     save(() => saveMenuStyle(next), `${MENU_STYLE_INFO[next].name} style is on your page`, (r) => {
-      if (!r.ok) setStyle(before);
+      if (r.ok) setSaved(next);
     });
   }
 
   return (
-    <>
-      <Card title="Menu style" text="How your menu looks to guests. Your dishes, prices and settings stay the same when you switch.">
-        <div role="radiogroup" aria-label="Menu style" className="grid gap-4 sm:grid-cols-2">
-          {MENU_STYLES.map((key) => {
-            const info = MENU_STYLE_INFO[key];
-            const active = key === style;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                disabled={pending}
-                onClick={() => pickStyle(key)}
-                className={cx(
-                  "rounded-2xl border-2 p-3 text-left transition",
-                  active ? "border-brand bg-brand/5" : "border-neutral-200 hover:border-neutral-300",
-                )}
-              >
-                <StyleThumb styleKey={key} accent={isHexColor(color) ? color : "#1f4fae"} />
-                <span className="mt-3 flex items-center gap-2">
-                  <span className="font-semibold">{info.name}</span>
-                  {active && <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">In use</span>}
-                </span>
-                <span className="mt-0.5 block text-sm text-neutral-600">{info.text}</span>
-                <span className="mt-1 block text-xs text-neutral-500">Good for: {info.bestFor}</span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-sm text-neutral-500">
-          More styles are on the way.{" "}
-          <Link href="/preview" className="font-semibold text-brand">
-            Preview your page
-          </Link>
-        </p>
-      </Card>
-
-      <Card
-        title="Accent colour"
-        text="Buttons, links and highlights on your page. Pick one, or use your own."
-        footer={
-          <Button onClick={() => save(() => saveAccentColor(color), "Colour saved")} disabled={pending || !isHexColor(color) || color === data.accentColor}>
-            Save colour
-          </Button>
-        }
-      >
-        <div className="flex flex-wrap gap-3">
-          {ACCENT_PRESETS.map((c) => (
-            <button
-              key={c}
-              type="button"
-              aria-label={`Colour ${c}`}
-              aria-pressed={color.toLowerCase() === c}
-              onClick={() => setColor(c)}
-              className={cx("h-11 w-11 rounded-full ring-offset-2 transition", color.toLowerCase() === c && "ring-2 ring-neutral-900")}
-              style={{ background: c }}
-            />
-          ))}
-        </div>
-        <Field label="Custom colour" htmlFor="p-color">
-          <div className="flex items-center gap-3">
-            <input type="color" aria-label="Pick a custom colour" value={isHexColor(color) ? color : "#000000"} onChange={(e) => setColor(e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-neutral-300 bg-white p-1" />
-            <input id="p-color" className={cx(inputClass, "w-36 font-mono")} value={color} onChange={(e) => setColor(e.target.value)} maxLength={7} />
-            <span className="rounded-full px-4 py-2 text-sm font-semibold text-white" style={{ background: isHexColor(color) ? color : "#999" }}>
-              Preview
-            </span>
+    <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:items-start lg:gap-8 lg:space-y-0">
+      <div className="space-y-6">
+        <Card title="Menu style" text="Tap a style to try it on your own menu. Guests keep seeing your current style until you press “Use this style”.">
+          <div role="radiogroup" aria-label="Menu style" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
+            {MENU_STYLES.map((key) => {
+              const info = MENU_STYLE_INFO[key];
+              const active = key === style;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setStyle(key)}
+                  className={cx("rounded-2xl border-2 p-2.5 text-left transition sm:p-3", active ? "border-brand bg-brand/5" : "border-neutral-200 hover:border-neutral-300")}
+                >
+                  <StyleThumb styleKey={key} accent={accent} />
+                  <span className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-semibold">{info.name}</span>
+                    {key === saved && <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">In use</span>}
+                  </span>
+                  <span className="mt-0.5 block text-sm text-neutral-600">{info.text}</span>
+                  <span className="mt-1 block text-xs text-neutral-500">Good for: {info.bestFor}</span>
+                </button>
+              );
+            })}
           </div>
-        </Field>
-      </Card>
+          <div className="flex flex-wrap items-center gap-3 border-t border-neutral-100 pt-4">
+            {style === saved ? (
+              <p className="text-sm text-neutral-600">
+                <span className="font-semibold text-neutral-900">{MENU_STYLE_INFO[saved].name}</span> is the style guests see now.
+              </p>
+            ) : (
+              <>
+                <Button onClick={applyStyle} disabled={pending}>
+                  Use this style
+                </Button>
+                <button type="button" onClick={() => setStyle(saved)} className="text-sm font-semibold text-neutral-600 hover:text-neutral-900">
+                  Keep {MENU_STYLE_INFO[saved].name}
+                </button>
+              </>
+            )}
+            <Link href={previewUrl(false)} className="ml-auto text-sm font-semibold text-brand lg:hidden">
+              Preview {MENU_STYLE_INFO[style].name} full screen
+            </Link>
+          </div>
+        </Card>
 
-    </>
+        <Card
+          title="Accent colour"
+          text="Buttons, links and highlights on your page. Pick one, or use your own. The Simple style is always black and white."
+          footer={
+            <Button onClick={() => save(() => saveAccentColor(color), "Colour saved")} disabled={pending || !isHexColor(color) || color === data.accentColor}>
+              Save colour
+            </Button>
+          }
+        >
+          <div className="flex flex-wrap gap-3">
+            {ACCENT_PRESETS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`Colour ${c}`}
+                aria-pressed={color.toLowerCase() === c}
+                onClick={() => setColor(c)}
+                className={cx("h-11 w-11 rounded-full ring-offset-2 transition", color.toLowerCase() === c && "ring-2 ring-neutral-900")}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+          <Field label="Custom colour" htmlFor="p-color">
+            <div className="flex items-center gap-3">
+              <input type="color" aria-label="Pick a custom colour" value={isHexColor(color) ? color : "#000000"} onChange={(e) => setColor(e.target.value)} className="h-11 w-14 cursor-pointer rounded-lg border border-neutral-300 bg-white p-1" />
+              <input id="p-color" className={cx(inputClass, "w-36 font-mono")} value={color} onChange={(e) => setColor(e.target.value)} maxLength={7} />
+              <span className="rounded-full px-4 py-2 text-sm font-semibold text-white" style={{ background: isHexColor(color) ? color : "#999" }}>
+                Preview
+              </span>
+            </div>
+          </Field>
+        </Card>
+      </div>
+
+      {/* Khung điện thoại xem thử menu thật của quán với kiểu/màu đang chọn (chỉ trên màn hình rộng) */}
+      <aside className="hidden lg:sticky lg:top-6 lg:block" aria-label="Live preview">
+        <div className="mb-2 flex items-center justify-between text-sm">
+          <span className="font-semibold">
+            Preview: {MENU_STYLE_INFO[style].name}
+            {style !== saved && <span className="ml-1 font-normal text-neutral-500">(not live yet)</span>}
+          </span>
+          <Link href={previewUrl(false)} className="font-semibold text-brand">
+            Full screen
+          </Link>
+        </div>
+        <div className="overflow-hidden rounded-[2.25rem] border-[10px] border-neutral-900 bg-white shadow-lg">
+          <iframe key={previewUrl(true)} src={previewUrl(true)} title={`Preview of your menu in the ${MENU_STYLE_INFO[style].name} style`} className="block h-[680px] w-full" />
+        </div>
+      </aside>
+    </div>
   );
 }
 
 /** Hình thu nhỏ của từng kiểu, vẽ bằng khối màu (không cần ảnh). */
 function StyleThumb({ styleKey, accent }: { styleKey: MenuStyleKey; accent: string }) {
   const rows = [0, 1, 2];
-  if (styleKey === "CLASSIC") {
-    return (
-      <span aria-hidden className="block h-36 overflow-hidden rounded-xl border border-[#e7dfd2] bg-[#fbf8f2] px-5 pt-4 text-center font-serif text-[#2b2620]">
-        <span className="block text-[11px] font-semibold tracking-[0.2em] uppercase">Your Restaurant</span>
-        <span className="mx-auto mt-1 block h-0.5 w-6" style={{ background: accent }} />
-        <span className="mt-2 block text-[9px] tracking-[0.2em] uppercase opacity-70">Mains</span>
-        {rows.map((i) => (
-          <span key={i} className="mt-1.5 flex items-baseline gap-1 text-[9px]">
-            <span className="h-1.5 rounded-sm bg-[#2b2620]/70" style={{ width: `${30 + i * 8}%` }} />
-            <span className="flex-1 border-b border-dotted border-[#2b2620]/40" />
-            <span className="h-1.5 w-5 rounded-sm bg-[#2b2620]/70" />
-          </span>
-        ))}
-      </span>
-    );
-  }
-  return (
-    <span aria-hidden className="block h-36 overflow-hidden rounded-xl border border-neutral-200 bg-white">
-      <span className="block h-8" style={{ background: accent }} />
-      <span className="-mt-4 ml-3 block h-8 w-8 rounded-lg border-2 border-white bg-white shadow-sm" />
-      <span className="mt-1 ml-3 block h-2 w-24 rounded-sm bg-neutral-800" />
-      <span className="mt-2 ml-3 flex gap-1">
-        <span className="h-3 w-12 rounded-full" style={{ background: accent }} />
-        <span className="h-3 w-12 rounded-full border border-neutral-300" />
-      </span>
-      {rows.slice(0, 2).map((i) => (
-        <span key={i} className="mx-3 mt-2 flex items-center gap-2">
-          <span className="h-1.5 flex-1 rounded-sm bg-neutral-300" />
-          <span className="h-1.5 w-5 rounded-sm bg-neutral-700" />
+  const box = "block h-32 overflow-hidden rounded-xl border sm:h-36";
+  switch (styleKey) {
+    case "CLASSIC":
+      return (
+        <span aria-hidden className={cx(box, "border-[#e7dfd2] bg-[#fbf8f2] px-4 pt-4 text-center font-serif text-[#2b2620]")}>
+          <span className="block text-[11px] font-semibold tracking-[0.2em] uppercase">Your Restaurant</span>
+          <span className="mx-auto mt-1 block h-0.5 w-6" style={{ background: accent }} />
+          <span className="mt-2 block text-[9px] tracking-[0.2em] uppercase opacity-70">Mains</span>
+          {rows.map((i) => (
+            <span key={i} className="mt-1.5 flex items-baseline gap-1 text-[9px]">
+              <span className="h-1.5 rounded-sm bg-[#2b2620]/70" style={{ width: `${30 + i * 8}%` }} />
+              <span className="flex-1 border-b border-dotted border-[#2b2620]/40" />
+              <span className="h-1.5 w-5 rounded-sm bg-[#2b2620]/70" />
+            </span>
+          ))}
         </span>
-      ))}
-    </span>
-  );
+      );
+    case "BOLD":
+      return (
+        <span aria-hidden className={cx(box, "border-neutral-200 bg-[#fffaf2]")}>
+          <span className="block px-3 pt-3 pb-2.5" style={{ background: accent }}>
+            <span className="block h-6 w-6 rounded-full border-2 bg-white" style={{ borderColor: accent }} />
+            <span className="mt-1.5 block h-3 w-24 rounded-sm bg-white" />
+            <span className="mt-1.5 block h-2.5 w-14 rounded-full bg-white/90" />
+          </span>
+          <span className="mx-3 mt-2 block h-2.5 w-16 rounded-sm bg-neutral-900" />
+          <span className="mx-3 mt-1 block h-1 w-6 rounded-full" style={{ background: accent }} />
+          {rows.slice(0, 2).map((i) => (
+            <span key={i} className="mx-3 mt-2 flex items-center gap-2">
+              <span className="h-5 w-5 rounded-md bg-neutral-300" />
+              <span className="h-2 flex-1 rounded-sm bg-neutral-800" />
+              <span className="h-3 w-6 rounded" style={{ background: accent }} />
+            </span>
+          ))}
+        </span>
+      );
+    case "GRID":
+      return (
+        <span aria-hidden className={cx(box, "border-neutral-200 bg-white text-center")}>
+          <span className="block h-7" style={{ background: `color-mix(in srgb, ${accent} 25%, white)` }} />
+          <span className="mx-auto -mt-3.5 block h-7 w-7 rounded-full border-2 border-white bg-neutral-200" />
+          <span className="mx-auto mt-1 block h-2 w-20 rounded-sm bg-neutral-800" />
+          <span className="mx-3 mt-2 grid grid-cols-3 gap-1.5">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <span key={i} className="block aspect-square rounded-md" style={{ background: i % 2 ? `color-mix(in srgb, ${accent} 35%, white)` : "#d4d4d4" }} />
+            ))}
+          </span>
+        </span>
+      );
+    case "DARK":
+      return (
+        <span aria-hidden className={cx(box, "border-neutral-800 bg-[#0f0f0f] text-white")}>
+          <span className="block h-14 px-3 pt-5" style={{ background: `linear-gradient(to top, #0f0f0f, color-mix(in srgb, ${accent} 50%, #333))` }}>
+            <span className="block h-1.5 w-10 rounded-sm" style={{ background: `color-mix(in srgb, ${accent} 45%, white)` }} />
+            <span className="mt-1.5 block h-3 w-24 rounded-sm bg-white/90" />
+          </span>
+          {rows.map((i) => (
+            <span key={i} className="mx-3 mt-2.5 flex items-center gap-1.5">
+              <span className="h-4 w-4 rounded bg-white/20" />
+              <span className="h-1.5 rounded-sm bg-white/70" style={{ width: `${25 + i * 8}%` }} />
+              <span className="flex-1 border-b border-dotted border-white/25" />
+              <span className="h-1.5 w-5 rounded-sm" style={{ background: `color-mix(in srgb, ${accent} 45%, white)` }} />
+            </span>
+          ))}
+        </span>
+      );
+    case "SIMPLE":
+      return (
+        <span aria-hidden className={cx(box, "border-neutral-300 bg-white px-4 pt-4 text-center")}>
+          <span className="mx-auto block h-3 w-24 rounded-sm bg-black" />
+          <span className="mx-auto mt-1.5 block h-1.5 w-20 rounded-sm bg-neutral-400" />
+          <span className="mt-3 block border-y-2 border-black py-1">
+            <span className="mx-auto block h-1.5 w-10 rounded-sm bg-black" />
+          </span>
+          {rows.slice(0, 2).map((i) => (
+            <span key={i} className="mt-2 flex items-center justify-between">
+              <span className="h-2 rounded-sm bg-black" style={{ width: `${40 + i * 10}%` }} />
+              <span className="h-2 w-6 rounded-sm bg-black" />
+            </span>
+          ))}
+        </span>
+      );
+    default:
+      return (
+        <span aria-hidden className={cx(box, "border-neutral-200 bg-white")}>
+          <span className="block h-8" style={{ background: accent }} />
+          <span className="-mt-4 ml-3 block h-8 w-8 rounded-lg border-2 border-white bg-white shadow-sm" />
+          <span className="mt-1 ml-3 block h-2 w-24 rounded-sm bg-neutral-800" />
+          <span className="mt-2 ml-3 flex gap-1">
+            <span className="h-3 w-12 rounded-full" style={{ background: accent }} />
+            <span className="h-3 w-12 rounded-full border border-neutral-300" />
+          </span>
+          {rows.slice(0, 2).map((i) => (
+            <span key={i} className="mx-3 mt-2 flex items-center gap-2">
+              <span className="h-1.5 flex-1 rounded-sm bg-neutral-300" />
+              <span className="h-5 w-5 rounded-md bg-neutral-200" />
+            </span>
+          ))}
+        </span>
+      );
+  }
 }
 
 // ── Buttons ──────────────────────────────────────────

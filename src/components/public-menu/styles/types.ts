@@ -38,7 +38,7 @@ export type StyleKit = {
     tab: string;
     chip: string;
     input: string;
-    /** Lưới món: 1 cột trên điện thoại, 2 cột trên màn hình rộng. */
+    /** Lưới món, gồm cả số cột, ví dụ "grid-cols-1 md:grid-cols-2". */
     itemGrid: string;
     /** Khung ô thông tin (giờ mở cửa, địa chỉ, bảng dị ứng). */
     panel: string;
@@ -54,6 +54,10 @@ export type StyleKit = {
   sidebar: boolean;
   /** Mô tả quán đã hiện ở đầu trang (thì mục About không lặp lại). */
   descriptionInHeader: boolean;
+  /** Đường kẻ giữa các món (tắt với kiểu lưới ảnh). Mặc định có. */
+  itemDivider?: boolean;
+  /** Bỏ màu nhấn của quán, dùng đen trắng (kiểu Simple). */
+  monochrome?: boolean;
   Header: (props: HeaderProps) => ReactNode;
   CategoryHeading: (props: CategoryHeadingProps) => ReactNode;
   ItemRow: (props: ItemRowProps) => ReactNode;

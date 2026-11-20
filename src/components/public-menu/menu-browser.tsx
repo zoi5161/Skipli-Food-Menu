@@ -211,9 +211,9 @@ export function MenuBrowser({
             visible.map((c) => (
               <section key={c.id} id={`cat-${c.id}`} className="scroll-mt-36 pt-12 lg:scroll-mt-24" aria-labelledby={`h-${c.id}`} data-section={c.id}>
                 <kit.CategoryHeading category={c} serving={formatServingTimes(c.servingDays, c.servingFrom, c.servingUntil)} count={c.items.length} />
-                <ul className={`mt-2 grid grid-cols-1 ${t.itemGrid}`}>
+                <ul className={`grid ${t.itemGrid} ${kit.itemDivider === false ? "mt-5" : "mt-2"}`}>
                   {c.items.map((item) => (
-                    <li key={item.id} className="border-b" style={{ borderColor: t.line }}>
+                    <li key={item.id} className={kit.itemDivider === false ? "" : "border-b"} style={kit.itemDivider === false ? undefined : { borderColor: t.line }}>
                       <kit.ItemRow item={item} currency={currency} onOpen={() => setOpenItem(item)} />
                     </li>
                   ))}

@@ -106,7 +106,7 @@ export const photoStyle: StyleKit = {
     tab: "text-neutral-500 hover:text-neutral-900 aria-[current=true]:text-neutral-900",
     chip: "rounded-full",
     input: "rounded-2xl bg-neutral-100 focus-within:ring-2 focus-within:ring-neutral-300",
-    itemGrid: "md:grid-cols-2 md:gap-x-10",
+    itemGrid: "grid-cols-1 md:grid-cols-2 md:gap-x-10",
     panel: "rounded-3xl border border-neutral-200",
     sectionTitle: "text-2xl font-bold tracking-tight sm:text-[28px]",
     muted: "text-neutral-600",
