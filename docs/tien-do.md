@@ -93,3 +93,5 @@
 - Chuẩn bị đưa app lên mạng với dịch vụ không cần thẻ: Neon (database), Supabase (kho ảnh), Resend (email đăng nhập), Vercel (web). Ẩn nút "N" của chế độ chạy thử khi demo.
 - Khi chuyển trang trong trang quản lý: mục vừa bấm ở menu bên trái có vòng xoay nhỏ, và trang đang tải hiện ô "Loading your menu…" (hoặc "Loading stats…", "Loading settings…") phía trên khung chờ. Trang menu của khách cũng hiện "Loading menu…" khi mạng chậm.
 - Trang quản lý giữ lại các trang đã mở 5 phút: quay lại Dashboard, Menu, Stats hiện ngay (khoảng 0,1 giây) thay vì tải lại. Thêm nút "Refresh" trên thanh trên cùng để lấy số liệu mới nhất; lưu thay đổi thì app vẫn tự làm mới. Sửa lỗi kèm theo: chủ quán mới tạo quán xong được đưa thẳng vào trang Menu.
+- Quán demo Casa Lupita Taqueria có ảnh cho đủ 21 món (thêm 16 ảnh: taco ăn sáng, al pastor, enchiladas, quesadilla, nachos guacamole, bắp nướng, horchata, nước hibiscus…), dùng để demo.
+- Sửa giao diện: giá theo cỡ ở mục Chef's picks không còn tràn sang ô bên cạnh (tự xuống dòng giữa các cỡ); rê chuột lên mọi nút đều hiện bàn tay, nút đang khóa hiện dấu cấm.

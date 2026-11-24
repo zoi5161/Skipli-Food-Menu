@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { priceDisplay, type Variant } from "@/lib/menu/format";
 
 // Hiện giá món trên trang khách: "$12.00", "Glass $10.00 · Bottle $36.00" hoặc "from $4.00".
@@ -20,12 +21,16 @@ export function PriceText({
   if (d.kind === "sizes") {
     return (
       <>
+        {/* Mỗi cỡ ("2 tacos $7.50") không bị cắt đôi, nhưng giữa các cỡ được xuống dòng khi ô hẹp
+            (dấu phân cách nằm ngoài khối không-xuống-dòng, nên trình duyệt có chỗ để ngắt). */}
         {d.parts.map((p, i) => (
-          <span key={p.name} className="whitespace-nowrap">
+          <Fragment key={p.name}>
             {i > 0 && <span className={nameClass}>{separator}</span>}
-            <span className={nameClass}>{p.name} </span>
-            {p.price}
-          </span>
+            <span className="whitespace-nowrap">
+              <span className={nameClass}>{p.name} </span>
+              {p.price}
+            </span>
+          </Fragment>
         ))}
       </>
     );

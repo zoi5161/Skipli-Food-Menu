@@ -38,6 +38,22 @@ Logo (`logo.png`) của từng quán là tự tạo (chữ trên nền màu), kh
 | casa-lupita/fish-tacos.jpg | photo-1615870216519-2f9fa575fa5c |
 | casa-lupita/burrito.jpg | photo-1626700051175-6818013e1d4f |
 | casa-lupita/carne-asada-plate.jpg | photo-1600891964092-4316c288032e |
+| casa-lupita/bacon-egg-taco.jpg | photo-1529006557810-274b9b2fc783 |
+| casa-lupita/chorizo-egg-taco.jpg | photo-1611250188496-e966043a0629 |
+| casa-lupita/potato-egg-taco.jpg | photo-1624300629298-e9de39c13be5 |
+| casa-lupita/al-pastor-tacos.jpg | photo-1564767655658-4e6b365884ff |
+| casa-lupita/chicken-tinga-tacos.jpg | photo-1552332386-f8dd00dc2f85 |
+| casa-lupita/barbacoa-tacos.jpg | photo-1504544750208-dc0358e63f7f |
+| casa-lupita/bean-cheese-burrito.jpg | photo-1566740933430-b5e70b06d2d5 |
+| casa-lupita/enchiladas.jpg | photo-1599789197514-47270cd526b4 |
+| casa-lupita/quesadilla.jpg | photo-1618040996337-56904b7850b9 |
+| casa-lupita/chips-guacamole.jpg | photo-1586511925558-a4c6376fe65f |
+| casa-lupita/elote.jpg | photo-1470119693884-47d3a1d1f180 |
+| casa-lupita/rice-beans.jpg | photo-1536304993881-ff6e9eefa2a6 |
+| casa-lupita/horchata.jpg | photo-1553787499-6f9133860278 |
+| casa-lupita/jamaica.jpg | photo-1595981267035-7b04ca84a82d |
+| casa-lupita/tamarindo.jpg | photo-1497534446932-c925b458314e |
+| casa-lupita/hot-chocolate.jpg | photo-1542990253-0d0f5be5f0ed |
 | pho-saigon/cover.jpg, pho-saigon/pho-tai.jpg | photo-1582878826629-29b7ad1cdc43 |
 | pho-saigon/pho-ga.jpg | photo-1555126634-323283e090fa |
 | pho-saigon/vermicelli.jpg | photo-1503764654157-72d979d9af2f |

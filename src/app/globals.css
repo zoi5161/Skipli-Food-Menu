@@ -23,6 +23,21 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Rê chuột lên nút thì hiện bàn tay (Tailwind 4 mặc định để mũi tên); nút đang khóa thì hiện dấu cấm.
+   Đặt trong lớp base để lớp cursor-* riêng của từng nút vẫn ghi đè được. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label:has(> input[type="checkbox"], > input[type="radio"], > input[type="file"]),
+  select,
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+}
+
 /* Hộp thoại (thẻ <dialog>) */
 dialog::backdrop {
   background: rgb(15 18 25 / 0.45);
