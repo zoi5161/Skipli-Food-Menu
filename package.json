@@ -13,6 +13,8 @@
     "db:down": "docker compose down",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
+    "env:shared": "node scripts/use-env.mjs shared",
+    "env:local": "node scripts/use-env.mjs local",
     "test": "vitest run",
     "test:e2e": "playwright test"
   },

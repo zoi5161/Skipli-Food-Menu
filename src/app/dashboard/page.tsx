@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireRestaurant } from "@/lib/restaurant";
 import { QrCard } from "@/components/qr-card";
 import { loadStats } from "@/lib/analytics/stats";
+import { publicSiteUrl } from "@/lib/site-url";
 
 export const metadata: Metadata = { title: "Dashboard · Skipli Food Menu" };
 
@@ -20,8 +21,8 @@ async function Overview() {
     db.allergen.count({ where }),
     db.menuItem.count({ where: { ...where, isSoldOut: true } }),
   ]);
-  // Tên miền lấy từ cấu hình (NEXT_PUBLIC_APP_URL), đổi khi có tên thương hiệu.
-  const host = new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3300").host;
+  // Tên miền lấy từ cấu hình (NEXT_PUBLIC_APP_URL, hoặc REMOTE_APP_URL khi dùng chung database với bản trên mạng).
+  const host = new URL(publicSiteUrl()).host;
   const publicPath = `${host}/@${restaurant.slug}`;
 
   const stats = [

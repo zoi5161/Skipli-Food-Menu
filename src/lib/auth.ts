@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { loginEmail, sendEmail } from "@/lib/email";
+import { appUrl } from "@/lib/site-url";
 
 // Đăng nhập bằng link gửi qua email (không mật khẩu).
 // - Link chỉ dùng được 1 lần, hết hạn sau 15 phút.
@@ -24,10 +25,6 @@ function hashToken(token: string) {
 
 export function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
-}
-
-function appUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3300").replace(/\/$/, "");
 }
 
 /**

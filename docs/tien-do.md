@@ -85,3 +85,9 @@
 - Thêm 4 kiểu menu mới, tổng cộng 6 kiểu: **Modern**, **Classic**, **Bold** (chữ to đậm, giá trong ô màu, hợp quán taco/food truck), **Grid** (lưới ảnh 2 cột kiểu Instagram, hợp cafe/tiệm bánh), **Dark** (nền tối sang trọng, hợp pizza/bar), **Simple** (chữ đen trắng cỡ lớn, không cần ảnh, giống menu chữ của SinglePlatform). Mỗi kiểu ghi rõ "hợp với loại quán nào".
 - Settings → Design có khung điện thoại **xem thử ngay menu thật của quán** với kiểu và màu đang chọn; khách vẫn thấy kiểu cũ cho tới khi chủ quán bấm "Use this style". Trên điện thoại có nút xem toàn màn hình.
 - Các quán demo dùng mỗi quán một kiểu để demo ngay: taco (Bold), phở (Classic), pizza (Dark), cafe (Grid). Đã kiểm tra cả 6 kiểu trên điện thoại và máy tính: đủ món, mở chi tiết món, không tràn màn hình.
+
+## Dùng chung dữ liệu giữa máy và bản trên mạng (24-11-2026)
+
+- App trên máy có thể dùng chung database và kho ảnh với bản trên mạng: thêm hoặc sửa món trên máy thì link trên mạng cập nhật gần như ngay (thử thật: khoảng 0,3 giây). Mã QR và link menu ở trang quản lý trên máy trỏ về link trên mạng.
+- Chuyển qua lại bằng một lệnh (`npm run env:shared` / `npm run env:local`). Có chốt an toàn: lệnh nạp lại quán demo và bộ kiểm tra tự động không chạy trên dữ liệu thật nếu không cho phép rõ ràng.
+- Chuẩn bị đưa app lên mạng với dịch vụ không cần thẻ: Neon (database), Supabase (kho ảnh), Resend (email đăng nhập), Vercel (web). Ẩn nút "N" của chế độ chạy thử khi demo.

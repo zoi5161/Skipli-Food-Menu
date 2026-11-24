@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
     return [{ source: "/@:slug", destination: "/m/:slug" }];
   },
   partialPrefetching: true,
+  // Ẩn nút tròn "N" của Next.js khi chạy trên máy (cho gọn lúc demo qua chia sẻ màn hình)
+  devIndicators: false,
   experimental: {
     // Ảnh món/logo gửi qua server action. Trình duyệt đã thu nhỏ ảnh trước, 4 MB là dư.
     serverActions: { bodySizeLimit: "4mb" },

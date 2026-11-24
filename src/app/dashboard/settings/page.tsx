@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { parseHours } from "@/lib/menu/hours";
 import { requireRestaurant } from "@/lib/restaurant";
+import { publicSiteUrl } from "@/lib/site-url";
 import { SETTINGS_TABS, type SettingsData, type SettingsTab } from "./tabs";
 import { SettingsEditor } from "./ui/settings-editor";
 
@@ -42,7 +43,7 @@ async function SettingsContent({ searchParams }: { searchParams: PageProps<"/das
     showDirections: r.showDirections,
     primaryButton: r.primaryButton,
     secondaryButton: r.secondaryButton,
-    publicHost: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3300").host,
+    publicHost: new URL(publicSiteUrl()).host,
   };
   return <SettingsEditor data={data} tab={tab} />;
 }

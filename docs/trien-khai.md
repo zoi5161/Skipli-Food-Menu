@@ -71,6 +71,7 @@ Database chỉ lưu đường dẫn tới ảnh; file ảnh nằm ở kho R2. R2
    | `EMAIL_FROM` | người gửi ở bước 3 |
    | `CRON_SECRET` | chuỗi ngẫu nhiên, tạo bằng lệnh `openssl rand -hex 32` trong Terminal |
    | `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_URL` | từ bước 3 (R2) |
+   | `REVALIDATE_SECRET` | chuỗi ngẫu nhiên, **giống** giá trị trong `.env.deploy` trên máy (xem mục 9). Không dùng chung database thì có thể bỏ qua |
    | `GEMINI_API_KEY`, `GROQ_API_KEY` | key AI dùng chung với Skipli Content (cho nút "Scan paper menu"). Tự chép từ `skipli-content-skills/deploy/.env`. Thiếu thì nút vẫn hiện nhưng báo "chưa cài đặt" |
 
 4. Bấm **Deploy**. Khi build, Vercel tự tạo bảng trong database Neon (lệnh `prisma migrate deploy` trong script `vercel-build`).
@@ -102,3 +103,37 @@ Database chỉ lưu đường dẫn tới ảnh; file ảnh nằm ở kho R2. R2
 - **Ảnh demo lên R2 (không bắt buộc):** chạy `npx prisma db seed` trên máy, với `.env` tạm trỏ tới database Neon và kho R2. Ảnh demo sẽ được đưa lên R2.
 - **Dọn dữ liệu:** Vercel tự gọi `/api/cron/cleanup` mỗi ngày (cấu hình trong `vercel.json`) để xóa link đăng nhập và phiên hết hạn, muối băm cũ, dữ liệu thống kê chi tiết cũ hơn 400 ngày.
 - **Vị trí khách:** thành phố, bang, quốc gia và tọa độ (đã làm tròn khoảng 10 km) chỉ có khi chạy trên Vercel.
+
+## 9. Bản trên máy dùng chung database với bản trên mạng (tuỳ chọn)
+
+Dùng khi muốn sửa menu ở app trên máy (ví dụ lúc demo qua chia sẻ màn hình) mà link trên mạng cũng đổi theo ngay.
+
+**Cách hoạt động:** app trên máy đọc và ghi thẳng vào database Neon và kho ảnh trên mạng. Mỗi lần chủ quán bấm lưu, app trên máy gửi tín hiệu tới `/api/revalidate` của bản trên mạng (kèm khóa `REVALIDATE_SECRET`), để bản trên mạng xóa lưu đệm trang menu của quán đó. Khách tải lại là thấy bản mới.
+
+**Chuẩn bị (một lần):**
+1. Mở file `.env.deploy` ở thư mục dự án, điền các giá trị giống trên Vercel: `DATABASE_URL`, `DIRECT_URL` và 6 biến `S3_*`.
+2. `REVALIDATE_SECRET` đã có sẵn trong `.env.deploy`. Chép đúng giá trị đó vào Vercel (cùng tên), rồi **Redeploy**.
+3. `REMOTE_APP_URL` trong `.env.deploy` là link Vercel. Sửa nếu Vercel đặt tên khác. **Không** thêm biến này vào Vercel.
+
+**Đưa 5 quán demo lên database trên mạng (một lần, sau khi Vercel deploy xong):**
+
+```bash
+ALLOW_REMOTE_SEED=1 npx tsx --env-file=.env.deploy prisma/seed.ts
+```
+
+Lệnh này xóa rồi tạo lại 5 quán demo trên database thật, và tải ảnh demo lên kho ảnh. Thiếu `ALLOW_REMOTE_SEED=1` thì lệnh tự dừng để không xóa nhầm dữ liệu thật.
+
+**Chuyển chế độ:**
+
+| Lệnh | App trên máy dùng |
+|---|---|
+| `npm run env:shared` | Database Neon và kho ảnh trên mạng, dùng chung với Vercel |
+| `npm run env:local` | Database Docker và ảnh trên máy (như ban đầu) |
+
+Sau khi chuyển, tắt rồi chạy lại `npm run dev`. Bản cài đặt trên máy được giữ ở `.env.docker`.
+
+**Lưu ý:**
+- Đang ở chế độ dùng chung thì **mọi thay đổi trên máy là thay đổi thật** trên link mạng.
+- Bộ kiểm tra tự động (`npm run test:e2e`) và lệnh nạp lại quán demo **tự từ chối chạy** khi database không ở trên máy. Muốn chạy kiểm tra thì `npm run env:local` trước.
+- Trang quản lý trên máy chậm hơn (khoảng 1–2 giây mỗi trang) vì database ở Mỹ. Trang menu trên mạng vẫn nhanh.
+- Ở chế độ dùng chung, link menu và mã QR trong trang quản lý trên máy trỏ về link trên mạng, nên quét bằng điện thoại thật là mở được.

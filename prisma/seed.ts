@@ -2,12 +2,15 @@
 // Mỗi quán có một tài khoản chủ quán riêng (đăng nhập bằng link hiện trên màn hình khi chạy trên máy):
 //   demo@example.com (Lantern & Ladle), demo-taqueria@, demo-pho@, demo-pizza@, demo-cafe@example.com
 // Chạy lại nhiều lần được: mỗi lần xóa các quán demo cũ rồi tạo lại.
+// Chốt an toàn: chỉ chạy trên database trên máy. Đưa quán demo lên database thật (Neon) thì phải cho phép rõ ràng:
+//   ALLOW_REMOTE_SEED=1 npx tsx --env-file=.env.deploy prisma/seed.ts
 
 import "dotenv/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { databaseHost, isLocalDatabaseUrl } from "../src/lib/db-target";
 import { removeStoredImage, storageMode, storeImage } from "../src/lib/storage";
 import { DEMO_RESTAURANTS, type DemoRestaurant } from "./demo-data";
 
@@ -181,6 +184,15 @@ async function seedAnalytics(restaurantId: string, demo: DemoRestaurant) {
 }
 
 async function main() {
+  const url = process.env.DATABASE_URL;
+  if (!isLocalDatabaseUrl(url)) {
+    if (process.env.ALLOW_REMOTE_SEED !== "1") {
+      console.error(`Stopped: DATABASE_URL points to ${databaseHost(url)}, not a database on this computer.`);
+      console.error("Seeding deletes and recreates the 5 demo restaurants there. If that is really what you want, run again with ALLOW_REMOTE_SEED=1.");
+      process.exit(1);
+    }
+    console.log(`Seeding the database at ${databaseHost(url)} (ALLOW_REMOTE_SEED=1).`);
+  }
   for (const demo of DEMO_RESTAURANTS) await seedRestaurant(demo);
   console.log(`Demo photos stored in: ${storageMode() === "s3" ? "S3 bucket" : "storage/media on this computer"}`);
 }

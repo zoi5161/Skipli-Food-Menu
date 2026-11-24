@@ -1,15 +1,12 @@
 import "server-only";
 import QRCode from "qrcode";
+import { publicSiteUrl } from "./site-url";
 
 // Mã QR dẫn tới trang menu của quán.
 // Link trong QR có thêm "?src=qr" để Phase 4 biết khách vào bằng cách quét mã (khác với bấm link).
 
-export function appBaseUrl() {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3300").replace(/\/$/, "");
-}
-
 export function qrTargetUrl(slug: string) {
-  return `${appBaseUrl()}/@${slug}?src=qr`;
+  return `${publicSiteUrl()}/@${slug}?src=qr`;
 }
 
 // Mức sửa lỗi "M": vẫn quét được khi mã bị bẩn/trầy khoảng 15%, mà ô vuông không quá dày.
