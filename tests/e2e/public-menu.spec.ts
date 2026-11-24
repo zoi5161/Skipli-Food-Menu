@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { query } from "./db";
 import { expectToast, signIn, uniqueEmail } from "./helpers";
 
 test("khách mở menu quán demo: lọc món, xem chi tiết món", async ({ page }) => {
@@ -38,10 +39,13 @@ test("link sai thì báo chưa mở, không lỗi", async ({ page }) => {
 });
 
 test("chủ quán bật trang, đổi giá, đổi link: khách thấy ngay", async ({ page, browser }) => {
-  await signIn(page, uniqueEmail("publish"));
+  const email = uniqueEmail("publish");
+  await signIn(page, email);
   await page.getByLabel("Restaurant name").fill("Publish Test Diner");
   await page.getByRole("button", { name: "Create my menu" }).click();
   await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  // Link thật của quán vừa tạo (có thể là publish-test-diner-1… nếu lần chạy trước bỏ dở còn quán cũ)
+  const [{ slug }] = await query<{ slug: string }>(`select r.slug from "Restaurant" r join "User" u on u.id = r."ownerId" where u.email = $1`, [email]);
 
   await page.getByRole("button", { name: "Add a category" }).first().click();
   await page.getByRole("dialog").getByLabel("Name *").fill("Mains");
@@ -54,7 +58,7 @@ test("chủ quán bật trang, đổi giá, đổi link: khách thấy ngay", as
 
   // Khách (trình duyệt khác, chưa đăng nhập): trang đang tắt
   const guest = await (await browser.newContext()).newPage();
-  await guest.goto("/@publish-test-diner");
+  await guest.goto(`/@${slug}`);
   await expect(guest.getByRole("heading", { name: "This menu isn't open yet" })).toBeVisible();
 
   // Chủ quán bật trang
@@ -92,7 +96,7 @@ test("chủ quán bật trang, đổi giá, đổi link: khách thấy ngay", as
   await expectToast(page, "Address changed");
   await guest.goto(`/@${newSlug}`);
   await expect(guest.getByRole("heading", { name: "Publish Test Diner" })).toBeVisible();
-  await guest.goto("/@publish-test-diner");
+  await guest.goto(`/@${slug}`);
   await expect(guest.getByRole("heading", { name: "This menu isn't open yet" })).toBeVisible();
 
   // Tắt trang → khách thấy "chưa mở"

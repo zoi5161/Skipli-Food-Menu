@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { LoadingBadge } from "@/components/page-loading";
 import { MenuView } from "@/components/public-menu/menu-view";
 import { getPublicMenu } from "@/lib/menu/public";
 
@@ -45,7 +46,8 @@ function NotLive() {
 
 function MenuSkeleton() {
   return (
-    <div className="mx-auto w-full max-w-2xl flex-1 bg-white">
+    <div className="relative mx-auto w-full max-w-2xl flex-1 bg-white">
+      <LoadingBadge label="Loading menu…" className="absolute top-4 left-1/2 z-10 -translate-x-1/2" />
       <div className="h-28 animate-pulse bg-neutral-200" />
       <div className="space-y-3 p-4">
         <div className="-mt-12 h-20 w-20 animate-pulse rounded-2xl bg-neutral-300" />

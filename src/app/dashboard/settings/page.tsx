@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { PageLoading } from "@/components/page-loading";
 import { parseHours } from "@/lib/menu/hours";
 import { requireRestaurant } from "@/lib/restaurant";
 import { publicSiteUrl } from "@/lib/site-url";
@@ -50,7 +51,7 @@ async function SettingsContent({ searchParams }: { searchParams: PageProps<"/das
 
 export default function SettingsPage(props: PageProps<"/dashboard/settings">) {
   return (
-    <Suspense fallback={<div className="mx-auto h-96 max-w-3xl animate-pulse rounded-2xl bg-neutral-200" />}>
+    <Suspense fallback={<PageLoading label="Loading settings…" width="max-w-3xl" blocks={["h-9 w-40", "h-10 w-96 rounded-full", "h-80"]} />}>
       <SettingsContent searchParams={props.searchParams} />
     </Suspense>
   );

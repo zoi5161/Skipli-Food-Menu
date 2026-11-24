@@ -29,6 +29,9 @@ const nextConfig: NextConfig = {
   experimental: {
     // Ảnh món/logo gửi qua server action. Trình duyệt đã thu nhỏ ảnh trước, 4 MB là dư.
     serverActions: { bodySizeLimit: "4mb" },
+    // Giữ các trang đã mở trong trình duyệt 5 phút: quay lại Dashboard/Stats hiện ngay, không tải lại.
+    // Lưu thay đổi (server action) hoặc bấm nút Refresh ở trang quản lý thì lấy lại số liệu mới.
+    staleTimes: { dynamic: 300 },
   },
   turbopack: {
     rules: {

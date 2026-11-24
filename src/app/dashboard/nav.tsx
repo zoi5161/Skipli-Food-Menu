@@ -1,7 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
+import { Spinner } from "@/components/page-loading";
+
+/** Vòng xoay nhỏ cạnh mục vừa bấm, trong lúc trang đó đang tải. Luôn chiếm chỗ (chỉ đổi độ mờ) để chữ không bị xô lệch. */
+function PendingHint() {
+  const { pending } = useLinkStatus();
+  return <Spinner className={`h-4 w-4 shrink-0 transition-opacity ${pending ? "opacity-100" : "opacity-0"}`} />;
+}
 
 const LINKS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -21,11 +28,12 @@ export function DashboardNav({ variant }: { variant: "sidebar" | "tabs" }) {
           <Link
             key={link.href}
             href={link.href}
-            className={`rounded-full px-4 py-1.5 text-sm font-medium whitespace-nowrap ${
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium whitespace-nowrap ${
               isActive(link.href) ? "bg-brand-soft text-brand" : "text-neutral-600"
             }`}
           >
             {link.label}
+            <PendingHint />
           </Link>
         ))}
       </nav>
@@ -38,11 +46,12 @@ export function DashboardNav({ variant }: { variant: "sidebar" | "tabs" }) {
         <Link
           key={link.href}
           href={link.href}
-          className={`rounded-xl px-4 py-2.5 font-medium ${
+          className={`flex items-center justify-between gap-2 rounded-xl px-4 py-2.5 font-medium ${
             isActive(link.href) ? "bg-brand-soft text-brand" : "text-neutral-700 hover:bg-neutral-100"
           }`}
         >
           {link.label}
+          <PendingHint />
         </Link>
       ))}
     </nav>

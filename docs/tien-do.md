@@ -91,3 +91,5 @@
 - App trên máy có thể dùng chung database và kho ảnh với bản trên mạng: thêm hoặc sửa món trên máy thì link trên mạng cập nhật gần như ngay (thử thật: khoảng 0,3 giây). Mã QR và link menu ở trang quản lý trên máy trỏ về link trên mạng.
 - Chuyển qua lại bằng một lệnh (`npm run env:shared` / `npm run env:local`). Có chốt an toàn: lệnh nạp lại quán demo và bộ kiểm tra tự động không chạy trên dữ liệu thật nếu không cho phép rõ ràng.
 - Chuẩn bị đưa app lên mạng với dịch vụ không cần thẻ: Neon (database), Supabase (kho ảnh), Resend (email đăng nhập), Vercel (web). Ẩn nút "N" của chế độ chạy thử khi demo.
+- Khi chuyển trang trong trang quản lý: mục vừa bấm ở menu bên trái có vòng xoay nhỏ, và trang đang tải hiện ô "Loading your menu…" (hoặc "Loading stats…", "Loading settings…") phía trên khung chờ. Trang menu của khách cũng hiện "Loading menu…" khi mạng chậm.
+- Trang quản lý giữ lại các trang đã mở 5 phút: quay lại Dashboard, Menu, Stats hiện ngay (khoảng 0,1 giây) thay vì tải lại. Thêm nút "Refresh" trên thanh trên cùng để lấy số liệu mới nhất; lưu thay đổi thì app vẫn tự làm mới. Sửa lỗi kèm theo: chủ quán mới tạo quán xong được đưa thẳng vào trang Menu.

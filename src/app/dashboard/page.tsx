@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { PageLoading } from "@/components/page-loading";
 import { db } from "@/lib/db";
 import { requireRestaurant } from "@/lib/restaurant";
 import { QrCard } from "@/components/qr-card";
@@ -113,7 +114,7 @@ async function Overview() {
 
 export default function DashboardPage() {
   return (
-    <Suspense fallback={<div className="mx-auto h-64 max-w-4xl animate-pulse rounded-2xl bg-neutral-200" />}>
+    <Suspense fallback={<PageLoading label="Loading your dashboard…" blocks={["h-9 w-56", "h-40", "h-56"]} />}>
       <Overview />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { LoadingBadge } from "@/components/page-loading";
 import { MenuView } from "@/components/public-menu/menu-view";
 import { isHexColor } from "@/lib/menu/color";
 import { loadPublicMenu } from "@/lib/menu/public";
@@ -53,7 +54,7 @@ async function Preview({ searchParams }: { searchParams: PageProps<"/preview">["
 
 export default function PreviewPage(props: PageProps<"/preview">) {
   return (
-    <Suspense fallback={<div className="flex-1 bg-white" />}>
+    <Suspense fallback={<div className="flex flex-1 justify-center bg-white pt-16"><LoadingBadge label="Loading preview…" /></div>}>
       <Preview searchParams={props.searchParams} />
     </Suspense>
   );

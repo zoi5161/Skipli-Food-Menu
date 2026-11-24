@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
+import { PageLoading } from "@/components/page-loading";
 import { ColumnChart, type ColumnPoint } from "@/components/charts";
 import { VisitorMap } from "@/components/visitor-map";
 import type { Device, Source } from "@/lib/analytics/classify";
@@ -289,7 +290,7 @@ async function StatsContent({ searchParams }: { searchParams: PageProps<"/dashbo
 
 export default function StatsPage(props: PageProps<"/dashboard/stats">) {
   return (
-    <Suspense fallback={<div className="mx-auto h-96 max-w-5xl animate-pulse rounded-3xl bg-neutral-200" />}>
+    <Suspense fallback={<PageLoading label="Loading stats…" width="max-w-5xl" blocks={["h-9 w-40", "h-28", "h-72"]} />}>
       <StatsContent searchParams={props.searchParams} />
     </Suspense>
   );

@@ -4,6 +4,7 @@ import { Suspense, type ReactNode } from "react";
 import { requireRestaurant } from "@/lib/restaurant";
 import { signOutAction } from "./actions";
 import { DashboardNav } from "./nav";
+import { RefreshButton } from "./refresh-button";
 
 // Khung chung của trang chủ quán: thanh trên + menu trái (máy tính) / thanh tab (điện thoại).
 // Phần đọc phiên đăng nhập nằm trong <Suspense> để khung trang hiện ngay.
@@ -31,10 +32,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <Suspense fallback={<span className="h-4 w-32 animate-pulse rounded bg-neutral-100" />}>
             <RestaurantName />
           </Suspense>
-          <Link href="/preview" className="ml-auto hidden text-sm font-medium text-neutral-500 hover:text-neutral-900 sm:inline">
+          <div className="ml-auto">
+            <RefreshButton />
+          </div>
+          <Link href="/preview" className="hidden text-sm font-medium text-neutral-500 hover:text-neutral-900 sm:inline">
             View live menu
           </Link>
-          <form action={signOutAction} className="ml-auto sm:ml-0">
+          <form action={signOutAction}>
             <button type="submit" className="text-sm font-medium text-neutral-500 hover:text-neutral-900">
               Sign out
             </button>

@@ -1,5 +1,6 @@
 "use server";
 
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -21,5 +22,8 @@ export async function createRestaurant(_prev: OnboardingState, formData: FormDat
       data: { ownerId: user.id, name: parsed.data, slug: await uniqueSlug(parsed.data) },
     });
   }
+  // Trình duyệt còn nhớ "chưa có quán → về trang Onboarding" (giữ trang 5 phút, next.config.ts):
+  // xóa bản nhớ đó để vào thẳng trang Menu của quán vừa tạo.
+  refresh();
   redirect("/dashboard/menu");
 }
