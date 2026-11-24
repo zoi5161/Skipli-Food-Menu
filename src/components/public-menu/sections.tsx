@@ -2,6 +2,7 @@ import Link from "next/link";
 import { directionsHref, formatAddress, type ContactKind, type ContactLink } from "@/lib/menu/contact";
 import type { PublicMenu } from "@/lib/menu/public";
 import { RichText } from "@/lib/menu/rich-text";
+import { LOGO_SRC } from "@/components/brand";
 import { ContactIcon } from "./contact-button";
 import type { StyleKit } from "./styles/types";
 import { CopyButton, HoursTable, OpenStatusLine, TodayHours } from "./widgets";
@@ -203,7 +204,7 @@ export function MenuFooter({ r, kit }: { r: R; kit: StyleKit }) {
             <Link href="/" className="inline-flex items-center gap-1.5 hover:underline">
               Made with
               {/* eslint-disable-next-line @next/next/no-img-element -- logo nhỏ */}
-              <img src="/assets/skipli-logo-512.png" alt="" width={16} height={16} className="rounded-sm" />
+              <img src={LOGO_SRC} alt="" width={16} height={16} />
               <span className="font-semibold">Skipli Menu</span>
             </Link>
           </p>

@@ -58,7 +58,7 @@ export function loginEmail(link: string, minutes: number) {
   const html = `<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#171717">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border-radius:16px;padding:32px">
-<tr><td style="font-size:18px;font-weight:700"><img src="${esc(new URL("/assets/skipli-logo-512.png", link).toString())}" alt="" width="28" height="28" style="vertical-align:middle;border-radius:6px;margin-right:8px">Skipli <span style="color:#1f4fae">Menu</span></td></tr>
+<tr><td style="font-size:18px;font-weight:700"><img src="${esc(new URL("/assets/skipli-logo2-512.png", link).toString())}" alt="" width="28" height="28" style="vertical-align:middle;margin-right:8px">Skipli <span style="color:#1f4fae">Menu</span></td></tr>
 <tr><td style="padding-top:24px;font-size:16px;line-height:24px">Tap the button to sign in. The link works once and expires in ${minutes} minutes.</td></tr>
 <tr><td style="padding-top:24px"><a href="${esc(link)}" style="display:inline-block;background:#1f4fae;color:#ffffff;text-decoration:none;font-weight:600;padding:12px 24px;border-radius:999px">Sign in to Skipli Menu</a></td></tr>
 <tr><td style="padding-top:24px;font-size:13px;line-height:20px;color:#737373">If the button doesn't work, copy this link into your browser:<br><span style="word-break:break-all;color:#404040">${esc(link)}</span></td></tr>

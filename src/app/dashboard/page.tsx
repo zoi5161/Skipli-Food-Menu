@@ -7,6 +7,7 @@ import { requireRestaurant } from "@/lib/restaurant";
 import { QrCard } from "@/components/qr-card";
 import { loadStats } from "@/lib/analytics/stats";
 import { publicSiteUrl } from "@/lib/site-url";
+import { PageStatusCard } from "./page-status-card";
 
 export const metadata: Metadata = { title: "Dashboard · Skipli Food Menu" };
 
@@ -78,22 +79,7 @@ async function Overview() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5">
-          <p className="text-xs font-medium tracking-wider text-neutral-500 uppercase">Page status</p>
-          <p className="mt-2 flex items-center gap-2">
-            <span className={`h-2.5 w-2.5 rounded-full ${restaurant.isPublished ? "bg-green-600" : "bg-red-500"}`} />
-            <span className="font-medium">{restaurant.isPublished ? "Live" : "Off"}</span>
-            <span className="text-neutral-500">{restaurant.isPublished ? "· guests can open your menu" : "· not live yet"}</span>
-          </p>
-          <p className="mt-3 flex gap-4 text-sm font-semibold">
-            <Link href="/dashboard/settings?tab=page" className="text-brand">
-              {restaurant.isPublished ? "Page settings" : "Turn it on"}
-            </Link>
-            <Link href="/preview" className="text-brand">
-              Preview
-            </Link>
-          </p>
-        </div>
+        <PageStatusCard initialLive={restaurant.isPublished} />
         <div className="rounded-2xl border border-neutral-200 bg-white p-5">
           <p className="text-xs font-medium tracking-wider text-neutral-500 uppercase">Sold out right now</p>
           <p className="mt-2">

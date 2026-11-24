@@ -95,3 +95,5 @@
 - Trang quản lý giữ lại các trang đã mở 5 phút: quay lại Dashboard, Menu, Stats hiện ngay (khoảng 0,1 giây) thay vì tải lại. Thêm nút "Refresh" trên thanh trên cùng để lấy số liệu mới nhất; lưu thay đổi thì app vẫn tự làm mới. Sửa lỗi kèm theo: chủ quán mới tạo quán xong được đưa thẳng vào trang Menu.
 - Quán demo Casa Lupita Taqueria có ảnh cho đủ 21 món (thêm 16 ảnh: taco ăn sáng, al pastor, enchiladas, quesadilla, nachos guacamole, bắp nướng, horchata, nước hibiscus…), dùng để demo.
 - Sửa giao diện: giá theo cỡ ở mục Chef's picks không còn tràn sang ô bên cạnh (tự xuống dòng giữa các cỡ); rê chuột lên mọi nút đều hiện bàn tay, nút đang khóa hiện dấu cấm.
+- Ô "Page status" ở Dashboard có nút gạt bật/tắt trang khách ngay tại chỗ. Bật thì lưu luôn; tắt thì hỏi lại một lần ("Turn off" / "Keep it live") để tránh lỡ tay làm khách không mở được menu.
+- Đổi sang logo Skipli mới (chữ S đỏ, nền trong suốt) ở đầu trang, trang đăng nhập, trang chủ, email đăng nhập, dòng "Made with" cuối menu; icon tab trình duyệt và icon khi thêm vào màn hình iPhone (nền trắng).
