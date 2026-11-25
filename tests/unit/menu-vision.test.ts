@@ -42,6 +42,11 @@ describe("toCents / parseMenuJson", () => {
     expect(parseMenuJson('{"categories":[{"name":"Tacos","items":[{"name":""},{"name":"Al Pastor","price":4}]}]}')[0].items).toHaveLength(1);
     expect(parseMenuJson("sorry, I can't read this")).toEqual([]);
   });
+  it("PDF nhiều trang: nhận dạng mỗi trang một {categories}", () => {
+    const cats = parseMenuJson(JSON.stringify([PHO_MENU, { categories: [{ name: "Drinks", items: [{ name: "Horchata", price: 3.75, variants: [] }] }] }]));
+    expect(cats.map((c) => c.name)).toEqual(["Phở", "Drinks"]);
+    expect(cats[1].items[0].priceCents).toBe(375);
+  });
   it("nhận cả dạng danh sách món phẳng có 'category'", () => {
     const cats = parseMenuJson(JSON.stringify([{ name: "Horchata", price: 3.5, category: "Drinks" }, { name: "Al Pastor Taco", price: 4, category: "Tacos" }]));
     expect(cats.map((c) => c.name)).toEqual(["Drinks", "Tacos"]);
@@ -54,7 +59,11 @@ describe("readMenuPhoto", () => {
     vi.stubEnv("GROQ_API_KEY", "");
     await expect(readMenuPhoto(img)).rejects.toMatchObject({ reason: "no-key" });
     vi.stubEnv("GEMINI_API_KEY", "g-key");
-    await expect(readMenuPhoto({ ...img, mime: "application/pdf" })).rejects.toBeInstanceOf(MenuReadError);
+    await expect(readMenuPhoto({ ...img, mime: "image/gif" })).rejects.toBeInstanceOf(MenuReadError);
+    // PDF chỉ Gemini đọc được: chỉ có key Groq thì báo chưa cài
+    vi.stubEnv("GEMINI_API_KEY", "");
+    vi.stubEnv("GROQ_API_KEY", "q");
+    await expect(readMenuPhoto({ ...img, mime: "application/pdf" })).rejects.toMatchObject({ reason: "no-key" });
   });
 
   it("gọi Gemini, key nằm ở header (không ở link)", async () => {
@@ -107,6 +116,18 @@ describe("readMenuPhoto", () => {
     expect(r.categories[0].items).toHaveLength(2);
     expect(Date.now() - t0).toBeLessThan(1500);
     expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("PDF: gửi đúng loại file, thử flash-lite trước, không gửi sang Groq", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "g");
+    vi.stubEnv("GEMINI_IMAGE_MODELS", "big-flash,small-flash-lite");
+    vi.stubEnv("GROQ_API_KEY", "q");
+    const fetchFn = vi.fn().mockResolvedValue(new Response("busy", { status: 503 }));
+    await expect(readMenuPhoto({ ...img, mime: "application/pdf" }, { fetchFn })).rejects.toMatchObject({ reason: "unavailable" });
+    expect(fetchFn.mock.calls.map((c) => String(c[0]).split("/models/")[1]?.split(":")[0])).toEqual(["small-flash-lite", "big-flash"]);
+    const body = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(body.contents[0].parts[0].inline_data.mime_type).toBe("application/pdf");
+    expect(body.generationConfig.maxOutputTokens).toBe(32000);
   });
 
   it("không AI nào trả lời thì báo unavailable", async () => {

@@ -79,7 +79,7 @@ async function newRestaurantWithItem(page: Page, name: string) {
   await signIn(page, uniqueEmail("photos"));
   await page.getByLabel("Restaurant name").fill(name);
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   await page.getByRole("button", { name: "Add a category" }).first().click();
   await page.getByRole("dialog").getByLabel("Name *").fill("Mains");
   await page.getByRole("dialog").getByRole("button", { name: "Add category" }).click();

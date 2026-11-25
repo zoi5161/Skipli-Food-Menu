@@ -76,6 +76,8 @@ model Restaurant {
   ownerId     String
   owner       User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   slug        String  @unique // phần sau /@ trong link
+  // Mã menu (dạng 571d...-....) dán vào Skipli Now để lấy dữ liệu món qua /api/menus/<mã>. Giữ nguyên khi sửa menu.
+  menuCode    String  @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String
   tagline     String?
   description String? // cho phép định dạng đơn giản (đậm, nghiêng, danh sách)

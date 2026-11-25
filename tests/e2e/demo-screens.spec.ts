@@ -4,7 +4,7 @@ import { signIn } from "./helpers";
 // Mở menu quán demo (cần chạy `npx prisma db seed` trước) và chụp ảnh để xem giao diện.
 test("menu quán demo hiện đủ và đúng giờ phục vụ", async ({ page }, testInfo) => {
   await signIn(page, "demo@example.com");
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+$/);
   await expect(page.getByText("Menu items")).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("dashboard.png"), fullPage: true });
 

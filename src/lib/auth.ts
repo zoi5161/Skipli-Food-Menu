@@ -62,22 +62,23 @@ export async function createLoginLink(
   return { ok: true, link };
 }
 
-/** Dùng link đăng nhập: đánh dấu đã dùng, tạo tài khoản nếu chưa có, tạo phiên và đặt cookie. */
-export async function consumeLoginToken(token: string): Promise<boolean> {
+/** Dùng link đăng nhập: đánh dấu đã dùng, tạo tài khoản nếu chưa có, tạo phiên và đặt cookie. Trả người vừa đăng nhập, hoặc null. */
+export async function consumeLoginToken(token: string): Promise<CurrentUser | null> {
   const record = await db.loginToken.findUnique({ where: { tokenHash: hashToken(token) } });
-  if (!record || record.usedAt || record.expiresAt < new Date()) return false;
+  if (!record || record.usedAt || record.expiresAt < new Date()) return null;
 
   // Đánh dấu đã dùng; điều kiện usedAt = null chặn trường hợp bấm 2 lần cùng lúc.
   const claimed = await db.loginToken.updateMany({
     where: { id: record.id, usedAt: null },
     data: { usedAt: new Date() },
   });
-  if (claimed.count !== 1) return false;
+  if (claimed.count !== 1) return null;
 
   const user = await db.user.upsert({
     where: { email: record.email },
     update: {},
     create: { email: record.email },
+    select: { id: true, email: true, name: true },
   });
 
   const sessionToken = newToken();
@@ -93,7 +94,7 @@ export async function consumeLoginToken(token: string): Promise<boolean> {
     path: "/",
     expires: expiresAt,
   });
-  return true;
+  return user;
 }
 
 export type CurrentUser = { id: string; email: string; name: string | null };

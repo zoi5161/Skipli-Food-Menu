@@ -18,7 +18,7 @@ async function scanQr(page: Page, selector: string): Promise<string | null> {
 }
 
 test("chưa đăng nhập thì không lấy được mã QR", async ({ request }) => {
-  const res = await request.get("/api/qr?format=png");
+  const res = await request.get("/restaurants/someone-else/qr?format=png");
   expect(res.status()).toBe(401);
 });
 
@@ -26,22 +26,23 @@ test("mã QR tải được PNG/SVG, quét ra đúng link menu", async ({ page }
   await signIn(page, uniqueEmail("qr"));
   await page.getByLabel("Restaurant name").fill("QR Test Cafe");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
 
+  const base = new URL(page.url()).pathname.replace(/\/menu$/, ""); // /restaurants/<id>
   await page.goto("/dashboard");
   const img = page.getByTestId("qr-image");
   await expect(img).toBeVisible();
   await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.naturalWidth)).toBeGreaterThan(0);
 
   // Nút tải về: đúng loại file và tên file
-  const png = await page.request.get("/api/qr?format=png&download=1");
+  const png = await page.request.get(`${base}/qr?format=png&download=1`);
   expect(png.headers()["content-type"]).toBe("image/png");
   expect(png.headers()["content-disposition"]).toContain('filename="menu-qr-qr-test-cafe');
   const pngBytes = await png.body();
   expect(pngBytes.subarray(1, 4).toString()).toBe("PNG");
   expect(pngBytes.length).toBeGreaterThan(5_000);
 
-  const svg = await page.request.get("/api/qr?format=svg&download=1");
+  const svg = await page.request.get(`${base}/qr?format=svg&download=1`);
   expect(svg.headers()["content-type"]).toContain("image/svg+xml");
   expect(await svg.text()).toContain("<svg");
 

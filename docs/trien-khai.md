@@ -137,3 +137,8 @@ Sau khi chuyển, tắt rồi chạy lại `npm run dev`. Bản cài đặt trê
 - Bộ kiểm tra tự động (`npm run test:e2e`) và lệnh nạp lại quán demo **tự từ chối chạy** khi database không ở trên máy. Muốn chạy kiểm tra thì `npm run env:local` trước.
 - Trang quản lý trên máy chậm hơn (khoảng 1–2 giây mỗi trang) vì database ở Mỹ. Trang menu trên mạng vẫn nhanh.
 - Ở chế độ dùng chung, link menu và mã QR trong trang quản lý trên máy trỏ về link trên mạng, nên quét bằng điện thoại thật là mở được.
+
+## 10. Studio cho nhân viên (biến STAFF_EMAILS)
+
+- Thêm biến `STAFF_EMAILS` trên Vercel (Settings → Environment Variables), ví dụ `an@skipli.com,binh@gmail.com`, hoặc `@skipli.com` để cho cả tên miền. Ai có trong danh sách thì vào Studio, thấy mọi quán và nhập được CSV.
+- Database trên mạng cần thêm cột mã menu trước khi dùng bản mới: chạy `npx prisma migrate deploy` khi `.env` đang ở chế độ dùng chung (`npm run env:shared`).

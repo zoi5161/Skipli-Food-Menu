@@ -1,23 +1,38 @@
 import "server-only";
-import { redirect } from "next/navigation";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { requireUser } from "@/lib/auth";
+import { requireUser, type CurrentUser } from "@/lib/auth";
 import { slugify } from "@/lib/menu/format";
+import { isStaffEmail } from "@/lib/staff";
+import { RESTAURANT_HEADER } from "@/lib/restaurant-path";
 
 // Những link không được dùng làm tên quán (trùng đường dẫn của app).
-export const RESERVED_SLUGS = new Set(["admin", "api", "app", "auth", "dashboard", "login", "logout", "menu", "onboarding", "preview", "settings", "support"]);
+export const RESERVED_SLUGS = new Set(["admin", "api", "app", "auth", "dashboard", "login", "logout", "menu", "onboarding", "preview", "restaurants", "settings", "studio", "support"]);
+
+export const isStaff = (user: Pick<CurrentUser, "email">) => isStaffEmail(user.email);
+
+/** Điều kiện lọc những quán người này được làm: nhân viên thì mọi quán, người khác chỉ quán đứng tên mình. */
+export function restaurantScope(user: CurrentUser) {
+  return isStaff(user) ? {} : { ownerId: user.id };
+}
+
+/** Quán `restaurantId` nếu người này được làm, ngược lại null. */
+export async function findRestaurantFor(user: CurrentUser, restaurantId: string | null | undefined) {
+  if (!restaurantId) return null;
+  return db.restaurant.findFirst({ where: { id: restaurantId, ...restaurantScope(user) } });
+}
 
 /**
- * Quán của người đang đăng nhập. Bản đầu mỗi tài khoản một quán.
- * Chưa có quán thì chuyển sang trang tạo quán.
+ * Quán đang mở trong Studio (đường dẫn /restaurants/<id>/... hoặc /preview/<id>).
+ * proxy.ts đọc <id> từ đường dẫn và gửi kèm, nên cả trang lẫn nút lưu (server action) đều biết đang sửa quán nào,
+ * kể cả khi nhân viên mở nhiều quán ở nhiều tab. Không được làm quán đó thì báo "không tìm thấy".
  */
 export async function requireRestaurant() {
   const user = await requireUser();
-  const restaurant = await db.restaurant.findFirst({
-    where: { ownerId: user.id },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!restaurant) redirect("/onboarding");
+  const restaurantId = (await headers()).get(RESTAURANT_HEADER);
+  const restaurant = await findRestaurantFor(user, restaurantId);
+  if (!restaurant) notFound();
   return { user, restaurant };
 }
 

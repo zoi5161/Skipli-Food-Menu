@@ -4,6 +4,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { AuthCard } from "@/components/auth-card";
 import { consumeLoginToken } from "@/lib/auth";
+import { homeFor } from "@/lib/legacy-redirect";
+import { restaurantPath } from "@/lib/restaurant-path";
 
 export const metadata: Metadata = { title: "Sign in · Skipli Food Menu" };
 
@@ -12,8 +14,9 @@ export const metadata: Metadata = { title: "Sign in · Skipli Food Menu" };
 async function confirmSignIn(formData: FormData) {
   "use server";
   const token = String(formData.get("token") ?? "");
-  const ok = token ? await consumeLoginToken(token) : false;
-  redirect(ok ? "/dashboard" : "/auth/verify?invalid=1");
+  const user = token ? await consumeLoginToken(token) : null;
+  // Nhân viên → danh sách nhà hàng; chủ một quán → quán của mình; chưa có quán → tạo quán
+  redirect(user ? await homeFor(user, (id) => restaurantPath(id)) : "/auth/verify?invalid=1");
 }
 
 async function VerifyContent({ searchParams }: { searchParams: PageProps<"/auth/verify">["searchParams"] }) {

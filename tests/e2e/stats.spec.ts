@@ -70,7 +70,7 @@ test("quán mới: trang trống; khách xem + bấm món thì số liệu hiệ
   await signIn(page, uniqueEmail("stats"));
   await page.getByLabel("Restaurant name").fill("Stats Test Grill");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   await page.getByRole("button", { name: "Add a category" }).first().click();
   await page.getByRole("dialog").getByLabel("Name *").fill("Mains");
   await page.getByRole("dialog").getByRole("button", { name: "Add category" }).click();

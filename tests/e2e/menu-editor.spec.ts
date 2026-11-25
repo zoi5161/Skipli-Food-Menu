@@ -28,7 +28,7 @@ test("chủ quán mới: tạo quán, danh mục, món, sửa giá, hết món",
   await expect(page).toHaveURL(/\/onboarding$/);
   await page.getByLabel("Restaurant name").fill("Test Kitchen");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   await expect(page.getByText("Start with a category.")).toBeVisible();
 
   // Thêm danh mục có giờ phục vụ (bữa sáng thứ 2–6, 7:00–11:00)
@@ -48,14 +48,14 @@ test("chủ quán mới: tạo quán, danh mục, món, sửa giá, hết món",
   // Thêm extra và allergen để gắn vào món
   await page.getByRole("link", { name: "Extra", exact: true }).click();
   await page.getByRole("button", { name: "Add an extra" }).click();
-  await page.getByLabel("Name").fill("Extra cheese");
+  await page.getByLabel("Name", { exact: true }).fill("Extra cheese");
   await page.getByLabel("Price").fill("1.50");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("+$1.50")).toBeVisible();
 
   await page.getByRole("link", { name: "Allergens" }).click();
   await page.getByRole("button", { name: "Add an allergen" }).click();
-  await page.getByLabel("Name").fill("Gluten");
+  await page.getByLabel("Name", { exact: true }).fill("Gluten");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Used on 0 items")).toBeVisible();
 

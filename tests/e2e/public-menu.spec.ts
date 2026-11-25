@@ -43,7 +43,7 @@ test("chủ quán bật trang, đổi giá, đổi link: khách thấy ngay", as
   await signIn(page, email);
   await page.getByLabel("Restaurant name").fill("Publish Test Diner");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   // Link thật của quán vừa tạo (có thể là publish-test-diner-1… nếu lần chạy trước bỏ dở còn quán cũ)
   const [{ slug }] = await query<{ slug: string }>(`select r.slug from "Restaurant" r join "User" u on u.id = r."ownerId" where u.email = $1`, [email]);
 
@@ -110,7 +110,7 @@ test("báo lỗi rõ ràng khi nhập sai trong cài đặt", async ({ page }) =
   await signIn(page, uniqueEmail("settings"));
   await page.getByLabel("Restaurant name").fill("Settings Check");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
 
   await page.goto("/dashboard/settings");
   await page.getByLabel("Google Maps link").fill("not a link");

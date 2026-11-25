@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { isbot } from "isbot";
 import { getCurrentUser } from "@/lib/auth";
+import { isStaffEmail } from "@/lib/staff";
 import { db } from "@/lib/db";
 import { LIMITS, classifySource, clientIp, deviceType, geoFromHeaders, hostOf, utcDay } from "./classify";
 
@@ -49,9 +50,9 @@ export async function track(input: TrackInput, headers: Headers): Promise<TrackR
   const restaurant = await db.restaurant.findUnique({ where: { slug: input.slug }, select: { id: true, ownerId: true, isPublished: true } });
   if (!restaurant || !restaurant.isPublished) return { counted: false, reason: "not-found" };
 
-  // Chủ quán tự xem trang của mình thì không tính
+  // Chủ quán hoặc nhân viên Skipli tự xem trang thì không tính
   const user = await getCurrentUser();
-  if (user?.id === restaurant.ownerId) return { counted: false, reason: "owner" };
+  if (user && (user.id === restaurant.ownerId || isStaffEmail(user.email))) return { counted: false, reason: "owner" };
 
   const now = new Date();
   const hash = await visitorHash(restaurant.id, clientIp(headers), userAgent, now);

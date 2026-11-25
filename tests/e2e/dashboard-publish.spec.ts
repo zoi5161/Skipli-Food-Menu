@@ -8,7 +8,7 @@ test("bật/tắt trang ngay ở Dashboard, tắt có hỏi lại", async ({ pag
   await signIn(page, email);
   await page.getByLabel("Restaurant name").fill("Dashboard Live Test");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   const [{ slug }] = await query<{ slug: string }>(`select r.slug from "Restaurant" r join "User" u on u.id = r."ownerId" where u.email = $1`, [email]);
 
   await page.goto("/dashboard");

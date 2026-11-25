@@ -97,3 +97,10 @@
 - Sửa giao diện: giá theo cỡ ở mục Chef's picks không còn tràn sang ô bên cạnh (tự xuống dòng giữa các cỡ); rê chuột lên mọi nút đều hiện bàn tay, nút đang khóa hiện dấu cấm.
 - Ô "Page status" ở Dashboard có nút gạt bật/tắt trang khách ngay tại chỗ. Bật thì lưu luôn; tắt thì hỏi lại một lần ("Turn off" / "Keep it live") để tránh lỡ tay làm khách không mở được menu.
 - Đổi sang logo Skipli mới (chữ S đỏ, nền trong suốt) ở đầu trang, trang đăng nhập, trang chủ, email đăng nhập, dòng "Made with" cuối menu; icon tab trình duyệt và icon khi thêm vào màn hình iPhone (nền trắng).
+- Settings → Design: khung điện thoại xem thử chỉ tải menu một lần; bấm đổi kiểu hay màu thì đổi ngay trong khoảng 0,1 giây (trước đây mỗi lần đổi phải tải lại cả trang, mất vài giây).
+
+## Studio cho nhân viên Skipli, thay khâu workflow tạo menu (25-11-2026)
+
+- App chuyển thành công cụ cho nhân viên Skipli quản lý nhiều nhà hàng. Thanh trên cùng có **Restaurants** (danh sách quán: tìm theo tên hoặc thành phố, lọc "No menu yet" / "Live", thêm quán nhanh) và **Import CSV** (nhập nhiều quán một lần từ file Excel / Google Sheets, xem trước từng dòng, dòng lỗi bị bỏ, quán đã có thì không nhập trùng, tự đoán múi giờ theo bang). Bấm vào một quán thì có các mục Overview · Menu · Stats · Settings như trước.
+- Tải **menu PDF** (nhiều trang, tới 4 MB) hoặc ảnh: AI đọc ra danh mục, món, giá (thử thật: menu PDF 15 món đọc đủ trong khoảng 4 giây), thay vì chờ workflow 12–24 giờ. Nhân viên xem lại, sửa rồi mới thêm.
+- Mỗi quán có **mã menu** (dạng `9d5df48e-0822-...`) kèm nút Copy, để dán vào Skipli Now. Link `/api/menus/<mã>` trả dữ liệu món dạng JSON. Mã giữ nguyên khi sửa menu, nên chỉ cần dán một lần. Danh sách nhân viên ghi trong biến `STAFF_EMAILS`; người không phải nhân viên chỉ thấy quán của mình.

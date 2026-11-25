@@ -78,7 +78,7 @@ test("xem thử kiểu mới không đổi trang khách cho tới khi bấm Use 
     await expect(page.getByRole("button", { name: "Use this style" })).toBeVisible();
     // Khung xem thử (màn hình rộng) hiện kiểu Dark
     if ((page.viewportSize()?.width ?? 0) >= 1024) {
-      const frame = page.frameLocator("iframe[title*='Dark']");
+      const frame = page.frameLocator('iframe[title="Preview of your menu"]');
       await expect(frame.locator("[data-menu-style]")).toHaveAttribute("data-menu-style", "DARK");
     }
     // Trang khách vẫn là Modern

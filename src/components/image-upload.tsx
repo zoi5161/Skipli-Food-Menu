@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useRef, useState, useTransition } from "react";
-import { removeImage, uploadImage, type ImageTarget } from "@/app/dashboard/media-actions";
+import { removeImage, uploadImage, type ImageTarget } from "@/app/restaurants/[rid]/media-actions";
 import { MAX_GALLERY } from "@/lib/media-limits";
 import { resizeImage } from "@/lib/resize-image";
 import { cx, useToast } from "./ui";

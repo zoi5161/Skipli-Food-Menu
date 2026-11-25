@@ -28,10 +28,15 @@ const GEMINI_MODEL_TIMEOUT_MS = 25_000;
 const GEMINI_TOTAL_MS = 40_000;
 const GROQ_TIMEOUT_MS = 30_000;
 export const MENU_MIME = ["image/jpeg", "image/png", "image/webp"] as const;
+export const PDF_MIME = "application/pdf";
 const MAX_ITEMS = 150;
+// Menu PDF (nhiều trang): chỉ Gemini đọc được PDF (Groq chỉ nhận ảnh), cần nhiều thời gian và chỗ trả lời hơn.
+const PDF_MAX_ITEMS = 400;
+const PDF_MODEL_TIMEOUT_MS = 60_000;
+const PDF_TOTAL_MS = 100_000;
 
 export const MENU_PROMPT = [
-  "This is a photo of a restaurant menu or price board. Copy EVERY dish you can read into JSON, nothing else:",
+  "This is a restaurant menu or price board (a photo, or a PDF with one or more pages). Copy EVERY dish you can read, on every page, into JSON, nothing else:",
   '{"categories":[{"name":"Pizza","items":[{"name":"Margherita","description":"Tomato, mozzarella, basil","price":12.5,"variants":[]}]}]}',
   "Rules:",
   "- Category and dish names exactly as printed, in the menu's own language. No categories on the menu: one category named \"Menu\".",
@@ -65,13 +70,19 @@ export async function readMenuPhoto(
   const gemini = process.env.GEMINI_API_KEY;
   const groq = process.env.GROQ_API_KEY;
   if (!gemini && !groq) throw new MenuReadError("Set GEMINI_API_KEY or GROQ_API_KEY", "no-key");
-  if (!(MENU_MIME as readonly string[]).includes(mime)) throw new MenuReadError("Use a JPG, PNG or WebP photo", "bad-image");
+  const pdf = mime === PDF_MIME;
+  if (!pdf && !(MENU_MIME as readonly string[]).includes(mime)) throw new MenuReadError("Use a PDF, JPG, PNG or WebP file", "bad-image");
+  if (pdf && !gemini) throw new MenuReadError("Reading PDF menus needs GEMINI_API_KEY", "no-key");
+  const maxItems = pdf ? PDF_MAX_ITEMS : MAX_ITEMS;
   const base64 = Buffer.from(bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes).toString("base64");
 
   let answered = false;
-  const modelMs = timeouts.geminiModelMs ?? GEMINI_MODEL_TIMEOUT_MS;
-  const geminiDeadline = Date.now() + (timeouts.geminiTotalMs ?? GEMINI_TOTAL_MS);
-  for (const model of gemini ? geminiModels() : []) {
+  const modelMs = timeouts.geminiModelMs ?? (pdf ? PDF_MODEL_TIMEOUT_MS : GEMINI_MODEL_TIMEOUT_MS);
+  const geminiDeadline = Date.now() + (timeouts.geminiTotalMs ?? (pdf ? PDF_TOTAL_MS : GEMINI_TOTAL_MS));
+  // PDF: thử flash-lite trước (thử thật 25-11-2026 với PDF menu: flash-lite đọc đủ 15 món trong 3 s,
+  // còn flash và 3.8-flash báo quá tải sau 35–55 s).
+  const models = pdf ? [...geminiModels()].sort((x, y) => Number(y.includes("lite")) - Number(x.includes("lite"))) : geminiModels();
+  for (const model of gemini ? models : []) {
     const budget = Math.min(modelMs, geminiDeadline - Date.now());
     if (budget < Math.min(3_000, modelMs)) break; // hết thời gian cho Gemini: sang Groq
     try {
@@ -81,7 +92,7 @@ export async function readMenuPhoto(
         headers: { "Content-Type": "application/json; charset=utf-8", "x-goog-api-key": gemini! },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: base64 } }, { text: MENU_PROMPT }] }],
-          generationConfig: { maxOutputTokens: 8000, temperature: 0, responseMimeType: "application/json" },
+          generationConfig: { maxOutputTokens: pdf ? 32000 : 8000, temperature: 0, responseMimeType: "application/json" },
         }),
         signal: anySignal(signal, budget),
       });
@@ -89,7 +100,7 @@ export async function readMenuPhoto(
       answered = true;
       const json = await res.json();
       const text = json.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("") ?? "";
-      const categories = parseMenuJson(text);
+      const categories = parseMenuJson(text, maxItems);
       if (categories.length) return { categories, engine: "gemini" };
     } catch (e) {
       if (signal?.aborted) throw e;
@@ -97,7 +108,7 @@ export async function readMenuPhoto(
   }
 
   // Groq when Gemini was busy, or answered without a dish it could use (a second opinion is cheap).
-  if (groq && base64.length <= GROQ_MAX_BASE64) {
+  if (groq && !pdf && base64.length <= GROQ_MAX_BASE64) {
     try {
       const res = await fetchFn(`${process.env.GROQ_API_BASE || "https://api.groq.com/openai/v1"}/chat/completions`, {
         method: "POST",
@@ -124,8 +135,8 @@ export async function readMenuPhoto(
   throw new MenuReadError("The AI is busy, try again in a minute", "unavailable");
 }
 
-/** The model's JSON kept to clean categories and dishes (max 150), prices in cents. Bad JSON → []. */
-export function parseMenuJson(text: string): ReadMenuCategory[] {
+/** The model's JSON kept to clean categories and dishes (max 150 by default), prices in cents. Bad JSON → []. */
+export function parseMenuJson(text: string, maxItems = MAX_ITEMS): ReadMenuCategory[] {
   const raw = String(text ?? "").replace(/```[a-z]*\n?/gi, "");
   const start = raw.search(/[[{]/);
   const end = Math.max(raw.lastIndexOf("}"), raw.lastIndexOf("]"));
@@ -140,8 +151,10 @@ export function parseMenuJson(text: string): ReadMenuCategory[] {
   const out: ReadMenuCategory[] = [];
   let count = 0;
   // Models do not always keep the asked shape: accept {categories:[…]}, a bare array of categories,
-  // or a flat array of dishes that each carry a "category".
-  const list: unknown[] = Array.isArray(data) ? data : Array.isArray((data as { categories?: unknown })?.categories) ? (data as { categories: unknown[] }).categories : [];
+  // a flat array of dishes that each carry a "category", or (PDF menus) one {categories:[…]} per page.
+  const cats_ = (x: unknown) => (Array.isArray((x as { categories?: unknown })?.categories) ? (x as { categories: unknown[] }).categories : null);
+  const pages = Array.isArray(data) && data.length > 0 && data.every((x) => cats_(x) !== null) ? data.flatMap((x) => cats_(x)!) : null;
+  const list: unknown[] = pages ?? (Array.isArray(data) ? data : (cats_(data) ?? []));
   const flat = list.length > 0 && list.every((x) => x && typeof x === "object" && !Array.isArray((x as { items?: unknown }).items));
   const cats: unknown[] = flat
     ? Object.entries(
@@ -157,7 +170,7 @@ export function parseMenuJson(text: string): ReadMenuCategory[] {
     for (const it of Array.isArray((c as { items?: unknown }).items) ? (c as { items: unknown[] }).items : []) {
       const o = it as Record<string, unknown>;
       const name = str(o.name, 120);
-      if (!name || count >= MAX_ITEMS) continue;
+      if (!name || count >= maxItems) continue;
       const variants = (Array.isArray(o.variants) ? o.variants : [])
         .map((v) => ({ name: str((v as Record<string, unknown>).name, 60), priceCents: toCents((v as Record<string, unknown>).price) }))
         .filter((v): v is ReadMenuVariant => !!v.name && v.priceCents !== null);

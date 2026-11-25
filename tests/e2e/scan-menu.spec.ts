@@ -31,7 +31,7 @@ async function newRestaurant(page: Page) {
   await signIn(page, uniqueEmail("scan"));
   await page.getByLabel("Restaurant name").fill("Scan Test Kitchen");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   await page.waitForLoadState("networkidle");
 }
 
@@ -43,10 +43,10 @@ test("đọc ảnh menu: xem lại, sửa giá, bỏ món, thêm vào menu (danh
   await page.getByRole("dialog").getByRole("button", { name: "Add category" }).click();
   await expectToast(page, "Category added");
 
-  await page.route("**/api/menu/read-photo", (route) => route.fulfill({ json: AI_RESULT }));
-  await page.getByRole("button", { name: "Scan paper menu" }).click();
-  const d = page.getByRole("dialog", { name: "Scan paper menu" });
-  await d.getByLabel("Menu photos").setInputFiles({ name: "menu.png", mimeType: "image/png", buffer: PNG });
+  await page.route("**/menu/read", (route) => route.fulfill({ json: AI_RESULT }));
+  await page.getByRole("button", { name: "Upload menu" }).click();
+  const d = page.getByRole("dialog", { name: "Upload menu" });
+  await d.getByLabel("Menu files").setInputFiles({ name: "menu.png", mimeType: "image/png", buffer: PNG });
 
   const review = page.getByRole("dialog", { name: "Check the dishes before adding" });
   await expect(review.getByText("We read 4 dishes in 2 categories.")).toBeVisible();
@@ -76,13 +76,44 @@ test("đọc ảnh menu: xem lại, sửa giá, bỏ món, thêm vào menu (danh
 test("AI chưa được cài (chưa có key) hoặc lỗi: báo rõ, không thêm gì", async ({ page }) => {
   test.skip(Boolean(process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY), "Máy này đã có key AI");
   await newRestaurant(page);
-  await page.getByRole("button", { name: "Scan paper menu" }).click();
-  await page.getByRole("dialog").getByLabel("Menu photos").setInputFiles({ name: "menu.png", mimeType: "image/png", buffer: PNG });
+  await page.getByRole("button", { name: "Upload menu" }).click();
+  await page.getByRole("dialog").getByLabel("Menu files").setInputFiles({ name: "menu.png", mimeType: "image/png", buffer: PNG });
   await expect(page.getByRole("dialog").getByRole("alert")).toHaveText("Menu scanning isn't set up yet. Add dishes by hand for now.");
-  await expect(page.getByRole("dialog").getByText("Take or choose photos")).toBeVisible();
+  await expect(page.getByRole("dialog").getByText("Choose a PDF or photos")).toBeVisible();
 });
 
 test("chưa đăng nhập thì không dùng được AI đọc menu", async ({ request }) => {
-  const res = await request.post("/api/menu/read-photo", { multipart: { photo: { name: "m.png", mimeType: "image/png", buffer: PNG } } });
+  const res = await request.post("/restaurants/someone-else/menu/read", { multipart: { photo: { name: "m.png", mimeType: "image/png", buffer: PNG } } });
   expect(res.status()).toBe(401);
+});
+
+// Menu PDF: gửi nguyên file (không thu nhỏ như ảnh), AI đọc ra món như với ảnh.
+const PDF = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n");
+
+test("tải menu PDF: gửi đúng file PDF, xem lại rồi thêm món", async ({ page }) => {
+  await newRestaurant(page);
+  let sent = "";
+  await page.route("**/menu/read", async (route) => {
+    sent = route.request().postDataBuffer()?.toString("latin1") ?? "";
+    await route.fulfill({ json: AI_RESULT });
+  });
+  await page.getByRole("button", { name: "Upload menu" }).click();
+  await page.getByRole("dialog", { name: "Upload menu" }).getByLabel("Menu files").setInputFiles({ name: "menu.pdf", mimeType: "application/pdf", buffer: PDF });
+  const review = page.getByRole("dialog", { name: "Check the dishes before adding" });
+  await expect(review.getByText("We read 4 dishes in 2 categories.")).toBeVisible();
+  expect(sent).toContain("Content-Type: application/pdf");
+  expect(sent).toContain("%PDF-1.4");
+  await review.getByRole("button", { name: "Add 4 dishes" }).click();
+  await expectToast(page, "Added 4 dishes and 2 new categories");
+});
+
+test("PDF quá 4 MB: báo ngay, không gửi đi", async ({ page }) => {
+  await newRestaurant(page);
+  let calls = 0;
+  await page.route("**/menu/read", (route) => (calls++, route.fulfill({ json: AI_RESULT })));
+  await page.getByRole("button", { name: "Upload menu" }).click();
+  const big = Buffer.concat([PDF, Buffer.alloc(4 * 1024 * 1024 + 10, 32)]);
+  await page.getByRole("dialog").getByLabel("Menu files").setInputFiles({ name: "big.pdf", mimeType: "application/pdf", buffer: big });
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("The PDF is over 4 MB");
+  expect(calls).toBe(0);
 });

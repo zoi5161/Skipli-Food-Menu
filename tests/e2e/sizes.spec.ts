@@ -7,7 +7,7 @@ test("giá theo cỡ: nhập, kiểm tra lỗi, khách thấy đúng, bỏ cỡ 
   await signIn(page, uniqueEmail("sizes"));
   await page.getByLabel("Restaurant name").fill("Sizes Test Bar");
   await page.getByRole("button", { name: "Create my menu" }).click();
-  await expect(page).toHaveURL(/\/dashboard\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
   await page.getByRole("button", { name: "Add a category" }).first().click();
   await page.getByRole("dialog").getByLabel("Name *").fill("Wine");
   await page.getByRole("dialog").getByRole("button", { name: "Add category" }).click();
