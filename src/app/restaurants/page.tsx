@@ -19,20 +19,20 @@ async function RestaurantList({ searchParams }: { searchParams: PageProps<"/rest
   const [user, sp] = await Promise.all([requireUser(), searchParams]);
   const staff = isStaff(user);
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 80) : "";
-  const filter = sp.filter === "no-menu" || sp.filter === "live" ? sp.filter : "all";
+  const filter = sp.filter === "no-menu" || sp.filter === "live" || sp.filter === "review" ? sp.filter : "all";
 
   const scope = restaurantScope(user);
   const where = {
     ...scope,
     ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" as const } }, { city: { contains: q, mode: "insensitive" as const } }] } : {}),
-    ...(filter === "no-menu" ? { items: { none: {} } } : filter === "live" ? { isPublished: true } : {}),
+    ...(filter === "no-menu" ? { items: { none: {} } } : filter === "live" ? { isPublished: true } : filter === "review" ? { menuJobs: { some: { status: "READY" as const } } } : {}),
   };
   const [restaurants, total, all] = await Promise.all([
     db.restaurant.findMany({
       where,
       orderBy: [{ updatedAt: "desc" }],
       take: PAGE_SIZE,
-      select: { id: true, name: true, city: true, region: true, isPublished: true, menuCode: true, updatedAt: true, _count: { select: { items: true } } },
+      select: { id: true, name: true, city: true, region: true, isPublished: true, menuCode: true, updatedAt: true, _count: { select: { items: true, menuJobs: { where: { status: "READY" } } } } },
     }),
     db.restaurant.count({ where }),
     db.restaurant.count({ where: scope }),
@@ -43,6 +43,7 @@ async function RestaurantList({ searchParams }: { searchParams: PageProps<"/rest
 
   const tabs = [
     { key: "all", label: "All" },
+    { key: "review", label: "To review" },
     { key: "no-menu", label: "No menu yet" },
     { key: "live", label: "Live" },
   ];
@@ -61,9 +62,14 @@ async function RestaurantList({ searchParams }: { searchParams: PageProps<"/rest
           </p>
         </div>
         {staff && (
-          <Link href="/restaurants/import" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-neutral-50">
-            Import CSV
-          </Link>
+          <div className="flex gap-2">
+            <Link href="/restaurants/bulk" className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark">
+              Bulk upload
+            </Link>
+            <Link href="/restaurants/import" className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-neutral-50">
+              Import CSV
+            </Link>
+          </div>
         )}
       </div>
 
@@ -126,9 +132,15 @@ async function RestaurantList({ searchParams }: { searchParams: PageProps<"/rest
                     {r.menuCode}
                   </code>
                   <CopyButton text={r.menuCode} label="Copy menu ID" ariaLabel={`Copy menu ID of ${r.name}`} />
-                  <Link href={restaurantPath(r.id, "menu")} className="rounded-full bg-brand px-3.5 py-1 text-xs font-semibold text-white hover:bg-brand-dark">
-                    {dishes ? "Edit menu" : "Upload menu"}
-                  </Link>
+                  {r._count.menuJobs > 0 ? (
+                    <Link href={restaurantPath(r.id, "menu")} className="rounded-full bg-amber-600 px-3.5 py-1 text-xs font-semibold whitespace-nowrap text-white hover:bg-amber-700">
+                      Review upload
+                    </Link>
+                  ) : (
+                    <Link href={restaurantPath(r.id, "menu")} className="rounded-full bg-brand px-3.5 py-1 text-xs font-semibold whitespace-nowrap text-white hover:bg-brand-dark">
+                      {dishes ? "Edit menu" : "Upload menu"}
+                    </Link>
+                  )}
                 </div>
               </li>
             );

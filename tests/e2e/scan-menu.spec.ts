@@ -101,19 +101,19 @@ test("tải menu PDF: gửi đúng file PDF, xem lại rồi thêm món", async 
   await page.getByRole("dialog", { name: "Upload menu" }).getByLabel("Menu files").setInputFiles({ name: "menu.pdf", mimeType: "application/pdf", buffer: PDF });
   const review = page.getByRole("dialog", { name: "Check the dishes before adding" });
   await expect(review.getByText("We read 4 dishes in 2 categories.")).toBeVisible();
-  expect(sent).toContain("Content-Type: application/pdf");
-  expect(sent).toContain("%PDF-1.4");
+  // PDF được tải lên kho trước, rồi máy chủ đọc file đó theo vị trí
+  expect(JSON.parse(sent)).toMatchObject({ mime: "application/pdf", key: expect.stringMatching(/^menu-files\/[a-z0-9]+\/[a-f0-9]{24}\.pdf$/) });
   await review.getByRole("button", { name: "Add 4 dishes" }).click();
   await expectToast(page, "Added 4 dishes and 2 new categories");
 });
 
-test("PDF quá 4 MB: báo ngay, không gửi đi", async ({ page }) => {
+test("PDF quá 20 MB: báo ngay, không gửi đi", async ({ page }) => {
   await newRestaurant(page);
   let calls = 0;
   await page.route("**/menu/read", (route) => (calls++, route.fulfill({ json: AI_RESULT })));
   await page.getByRole("button", { name: "Upload menu" }).click();
-  const big = Buffer.concat([PDF, Buffer.alloc(4 * 1024 * 1024 + 10, 32)]);
+  const big = Buffer.concat([PDF, Buffer.alloc(20 * 1024 * 1024 + 10, 32)]);
   await page.getByRole("dialog").getByLabel("Menu files").setInputFiles({ name: "big.pdf", mimeType: "application/pdf", buffer: big });
-  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("The PDF is over 4 MB");
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText("The PDF is over 20 MB");
   expect(calls).toBe(0);
 });

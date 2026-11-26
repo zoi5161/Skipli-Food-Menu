@@ -133,6 +133,8 @@ model Restaurant {
   pageViews  PageView[]
   itemClicks ItemClick[]
   menuReads  AiMenuRead[]
+  snapshots  MenuSnapshot[]
+  menuJobs   MenuJob[]
 
   @@index([ownerId])
 }
@@ -324,5 +326,55 @@ model AiMenuRead {
   dishes       Int        @default(0)
   createdAt    DateTime   @default(now())
 
+  @@index([restaurantId, createdAt])
+}
+
+/// Bản lưu menu cũ (tab History): lưu trước mỗi lần thêm món từ file, thay cả menu, hoặc khôi phục.
+/// `data` = toàn bộ danh mục và món lúc đó (xem MenuDoc trong src/lib/menu/history.ts). Giữ 30 bản mới nhất mỗi quán.
+model MenuSnapshot {
+  id             String     @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  reason         String // "import" | "replace" | "restore"
+  note           String?
+  itemCount      Int
+  categoryCount  Int
+  data           Json
+  createdByEmail String?
+  createdAt      DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
+}
+
+enum MenuJobStatus {
+  QUEUED // đã tải file lên, chờ AI đọc
+  READING
+  READY // AI đọc xong, chờ nhân viên duyệt
+  FAILED
+  APPLIED // đã thêm vào menu
+  DISMISSED // bỏ qua
+}
+
+/// Một file menu (PDF/ảnh) tải lên ở trang Bulk upload. AI đọc phía sau trên máy chủ, nhân viên duyệt sau.
+model MenuJob {
+  id             String        @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  fileKey        String // vị trí file trong kho (xem src/lib/menu-files.ts)
+  fileName       String
+  fileSize       Int
+  mime           String
+  status         MenuJobStatus @default(QUEUED)
+  result         Json? // danh mục và món AI đọc được
+  dishes         Int           @default(0)
+  error          String?
+  attempts       Int           @default(0)
+  createdByEmail String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status, createdAt])
   @@index([restaurantId, createdAt])
 }

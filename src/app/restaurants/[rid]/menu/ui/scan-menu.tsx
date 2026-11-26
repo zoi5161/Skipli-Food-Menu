@@ -6,7 +6,9 @@ import { Button, Dialog, cx, inputClass, useToast } from "@/components/ui";
 import { centsToInput, parsePriceInput } from "@/lib/menu/format";
 import { resizeImage } from "@/lib/resize-image";
 import { restaurantPath } from "@/lib/restaurant-path";
+import { MAX_MENU_FILE_MB, isPdfFile, putFile } from "@/lib/upload-client";
 import { importMenu } from "../actions";
+import { startMenuUpload } from "../upload-actions";
 
 // "Upload menu": chọn file PDF hoặc ảnh menu giấy → AI đọc ra danh mục, món, giá
 // → nhân viên XEM LẠI, sửa, bỏ món sai → bấm thêm. Không có gì được lưu trước khi bấm đồng ý.
@@ -14,11 +16,9 @@ import { importMenu } from "../actions";
 type DraftVariant = { name: string; price: string };
 type DraftItem = { key: string; include: boolean; name: string; description: string; price: string; variants: DraftVariant[] };
 type DraftCategory = { key: string; include: boolean; name: string; items: DraftItem[] };
-type ReadResult = { categories: { name: string; items: { name: string; description: string | null; priceCents: number | null; variants: { name: string; priceCents: number }[] }[] }[] };
+export type ReadResult = { categories: { name: string; items: { name: string; description: string | null; priceCents: number | null; variants: { name: string; priceCents: number }[] }[] }[] };
 
 const MAX_PHOTOS = 4;
-const MAX_PDF_BYTES = 4 * 1024 * 1024; // giống giới hạn ở menu/read/route.ts
-const isPdf = (f: File) => f.type === "application/pdf" || /\.pdf$/i.test(f.name);
 let keySeq = 0;
 const nextKey = () => `k${keySeq++}`;
 
@@ -47,7 +47,7 @@ const cents = (p: string) => {
   return r.ok ? r.cents : null;
 };
 
-export function ScanMenuButton({ existingCategories, variant = "secondary" }: { existingCategories: string[]; variant?: "primary" | "secondary" }) {
+export function ScanMenuButton({ existingCategories, dishCount, variant = "secondary" }: { existingCategories: string[]; dishCount: number; variant?: "primary" | "secondary" }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -58,20 +58,37 @@ export function ScanMenuButton({ existingCategories, variant = "secondary" }: { 
         </svg>
         Upload menu
       </Button>
-      {open && <ScanMenuDialog existingCategories={existingCategories} onClose={() => setOpen(false)} />}
+      {open && <ScanMenuDialog existingCategories={existingCategories} dishCount={dishCount} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: string[]; onClose: () => void }) {
+/** Một file ở trang Bulk upload đã được AI đọc xong: mở thẳng bước xem lại. */
+export type ReadyJob = { id: string; fileName: string; result: ReadResult };
+
+export function ScanMenuDialog({
+  existingCategories,
+  dishCount,
+  job,
+  onClose,
+  onSaved,
+}: {
+  existingCategories: string[];
+  dishCount: number;
+  job?: ReadyJob;
+  onClose: () => void;
+  onSaved?: () => void;
+}) {
   const toast = useToast();
   const inputId = useId();
   const abort = useRef<AbortController | null>(null);
   const { rid } = useParams<{ rid: string }>();
-  const [step, setStep] = useState<"pick" | "reading" | "review">("pick");
+  const [step, setStep] = useState<"pick" | "reading" | "review">(job ? "review" : "pick");
+  // Menu đang có món: chọn thêm vào hay thay cả menu (bản cũ được lưu ở tab History)
+  const [mode, setMode] = useState<"add" | "replace">("add");
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<DraftCategory[]>([]);
+  const [draft, setDraft] = useState<DraftCategory[]>(() => (job ? toDraft(job.result, []) : []));
   const [saving, setSaving] = useState(false);
   const existing = new Set(existingCategories.map((n) => n.trim().toLowerCase()));
 
@@ -92,15 +109,25 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
     const problems: string[] = [];
     for (const [i, file] of list.entries()) {
       try {
-        const form = new FormData();
-        if (isPdf(file)) {
-          if (file.size > MAX_PDF_BYTES) throw new Error("The PDF is over 4 MB. Save it smaller, or upload photos of the pages.");
-          form.set("photo", new Blob([file], { type: "application/pdf" }), "menu.pdf");
+        let res: Response;
+        if (isPdfFile(file)) {
+          // PDF: tải thẳng lên kho (tới 20 MB), rồi nhờ máy chủ đọc file đó
+          if (file.size > MAX_MENU_FILE_MB * 1024 * 1024) throw new Error(`The PDF is over ${MAX_MENU_FILE_MB} MB. Save it smaller, or upload photos of the pages.`);
+          const t = await startMenuUpload({ mime: "application/pdf", size: file.size });
+          if (!t.ok) throw new Error(t.error);
+          await putFile(t.ticket.url, t.ticket.headers, file, undefined, abort.current.signal);
+          res = await fetch(`${restaurantPath(rid, "menu")}/read`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: t.ticket.key, mime: "application/pdf" }),
+            signal: abort.current.signal,
+          });
         } else {
-          // Thu nhỏ nhưng giữ đủ nét để đọc chữ trên menu
+          // Ảnh: thu nhỏ nhưng giữ đủ nét để đọc chữ trên menu
+          const form = new FormData();
           form.set("photo", await resizeImage(file, { maxEdge: 2400 }), "menu.jpg");
+          res = await fetch(`${restaurantPath(rid, "menu")}/read`, { method: "POST", body: form, signal: abort.current.signal });
         }
-        const res = await fetch(`${restaurantPath(rid, "menu")}/read`, { method: "POST", body: form, signal: abort.current.signal });
         const json = await res.json().catch(() => ({ error: "Something went wrong. Please try again." }));
         if (!res.ok) problems.push(list.length > 1 ? `File ${i + 1}: ${json.error}` : json.error);
         else acc = toDraft(json as ReadResult, acc);
@@ -130,6 +157,8 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
   async function save() {
     setSaving(true);
     const payload = {
+      mode,
+      jobId: job?.id,
       categories: draft
         .filter((c) => c.include)
         .map((c) => ({
@@ -151,7 +180,12 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
       toast(r.error, "error");
       return;
     }
-    toast(`Added ${r.added} ${r.added === 1 ? "dish" : "dishes"}${r.newCategories ? ` and ${r.newCategories} new ${r.newCategories === 1 ? "category" : "categories"}` : ""}`);
+    toast(
+      mode === "replace"
+        ? `Menu replaced: ${r.added} ${r.added === 1 ? "dish" : "dishes"}. The old menu is in History.`
+        : `Added ${r.added} ${r.added === 1 ? "dish" : "dishes"}${r.newCategories ? ` and ${r.newCategories} new ${r.newCategories === 1 ? "category" : "categories"}` : ""}`,
+    );
+    onSaved?.();
     onClose();
   }
 
@@ -164,15 +198,17 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
       footer={
         step === "review" ? (
           <>
-            <Button variant="secondary" onClick={() => (setStep("pick"), setDraft([]))} disabled={saving} className="whitespace-nowrap">
-              Rescan
-            </Button>
+            {!job && (
+              <Button variant="secondary" onClick={() => (setStep("pick"), setDraft([]))} disabled={saving} className="whitespace-nowrap">
+                Rescan
+              </Button>
+            )}
             <div className="ml-auto flex gap-2">
               <Button variant="secondary" onClick={close} disabled={saving}>
                 Cancel
               </Button>
               <Button onClick={save} disabled={saving || chosen.length === 0 || invalid}>
-                {saving ? "Adding…" : `Add ${chosen.length} ${chosen.length === 1 ? "dish" : "dishes"}`}
+                {saving ? "Saving…" : mode === "replace" ? `Replace menu with ${chosen.length} ${chosen.length === 1 ? "dish" : "dishes"}` : `Add ${chosen.length} ${chosen.length === 1 ? "dish" : "dishes"}`}
               </Button>
             </div>
           </>
@@ -183,7 +219,7 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
         <div className="space-y-4">
           <p className="text-neutral-700">Upload the menu PDF, or photos of the paper menu. We read the dishes and prices, then you check everything before it’s added.</p>
           <ul className="space-y-1.5 text-sm text-neutral-600">
-            <li>• A PDF can have many pages (up to 4 MB). Reading a long PDF takes up to a minute.</li>
+            <li>• A PDF can have many pages (up to {MAX_MENU_FILE_MB} MB). Reading a long PDF takes up to a few minutes.</li>
             <li>• Photos: lay the menu flat, in good light, and fill the photo with it.</li>
             <li>• Choose up to {MAX_PHOTOS} files at once. Nothing is added until you approve it.</li>
           </ul>
@@ -216,6 +252,28 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
 
       {step === "review" && (
         <div className="space-y-5">
+          {job && <p className="text-sm font-medium text-neutral-800">From {job.fileName}</p>}
+          {dishCount > 0 && (
+            <fieldset className="rounded-2xl bg-neutral-50 p-3">
+              <legend className="sr-only">How to save</legend>
+              <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="import-mode" checked={mode === "add"} onChange={() => setMode("add")} className="mt-0.5 accent-brand" />
+                  <span>
+                    <b>Add to the current menu</b>
+                    <span className="block text-neutral-500">Keeps the {dishCount} dishes already there.</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="import-mode" checked={mode === "replace"} onChange={() => setMode("replace")} className="mt-0.5 accent-brand" />
+                  <span>
+                    <b>Replace the whole menu</b>
+                    <span className="block text-neutral-500">For a new menu. Dishes with the same name keep their photo and stats. The old menu is saved in History.</span>
+                  </span>
+                </label>
+              </div>
+            </fieldset>
+          )}
           <p className="text-sm text-neutral-600">
             We read {draft.reduce((n, c) => n + c.items.length, 0)} dishes in {draft.length} {draft.length === 1 ? "category" : "categories"}. Please check names and prices against your menu,
             fix anything that’s off, and untick dishes you don’t want.
@@ -227,7 +285,7 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
                 <div className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3">
                   <input type="checkbox" checked={c.include} onChange={(e) => editCat(c.key, { include: e.target.checked })} aria-label={`Add category ${c.name}`} className="h-4 w-4 accent-brand" />
                   <input aria-label="Category name" className={cx(inputClass, "font-semibold", !c.name.trim() && "border-red-400")} value={c.name} onChange={(e) => editCat(c.key, { name: e.target.value })} maxLength={60} />
-                  <span className="shrink-0 text-xs text-neutral-500">{merge ? "Adds to your existing category" : "New category"}</span>
+                  <span className="shrink-0 text-xs text-neutral-500">{mode === "replace" ? "" : merge ? "Adds to your existing category" : "New category"}</span>
                 </div>
                 <ul className="divide-y divide-neutral-100">
                   {c.items.map((it) => (
@@ -235,7 +293,7 @@ function ScanMenuDialog({ existingCategories, onClose }: { existingCategories: s
                       <input type="checkbox" checked={it.include} onChange={(e) => editItem(c.key, it.key, { include: e.target.checked })} aria-label={`Add ${it.name}`} className="mt-3 h-4 w-4 accent-brand" />
                       <div className="min-w-0 flex-1 space-y-2">
                         <div className="flex gap-2">
-                          <input aria-label="Dish name" className={cx(inputClass, "min-w-0 flex-1", !it.name.trim() && "border-red-400")} value={it.name} onChange={(e) => editItem(c.key, it.key, { name: e.target.value })} maxLength={80} />
+                          <input aria-label="Dish name" className={cx(inputClass, "min-w-0 flex-1", !it.name.trim() && "border-red-400")} value={it.name} onChange={(e) => editItem(c.key, it.key, { name: e.target.value })} maxLength={120} />
                           {it.variants.length === 0 && (
                             <div className="relative w-28 shrink-0">
                               <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-neutral-400">$</span>

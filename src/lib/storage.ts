@@ -52,6 +52,12 @@ function s3Config(): S3Config | null {
   };
 }
 
+/** Kho S3 đang dùng (để file menu dùng chung kho với ảnh), hoặc null khi lưu trên máy. */
+export function s3Target(): { client: S3Client; bucket: string } | null {
+  const cfg = s3Config();
+  return cfg ? { client: s3(cfg), bucket: cfg.bucket } : null;
+}
+
 export function storageMode(): "s3" | "local" {
   return s3Config() ? "s3" : "local";
 }

@@ -138,3 +138,31 @@ describe("readMenuPhoto", () => {
     await expect(readMenuPhoto(img, { fetchFn })).rejects.toMatchObject({ reason: "unavailable" });
   });
 });
+
+describe("file lớn: tải lên Gemini trước (Files API)", () => {
+  it("tải file theo 2 bước, chờ file sẵn sàng, rồi gửi đường dẫn thay vì cả file", async () => {
+    vi.stubEnv("GEMINI_API_KEY", "g");
+    vi.stubEnv("GEMINI_IMAGE_MODELS", "m-lite");
+    vi.stubEnv("GROQ_API_KEY", "q");
+    const big = { bytes: new Uint8Array(11 * 1024 * 1024), mime: "application/pdf" }; // base64 > 14 MB
+    const calls: string[] = [];
+    const fetchFn = vi.fn(async (url: string, init: RequestInit) => {
+      calls.push(`${init?.method ?? "GET"} ${url.replace(/^https:\/\/[^/]+/, "")}`);
+      if (url.endsWith("/upload/v1beta/files")) return new Response("{}", { status: 200, headers: { "x-goog-upload-url": "https://upload.example/session1" } });
+      if (url === "https://upload.example/session1") return new Response(JSON.stringify({ file: { name: "files/abc", uri: "https://g/files/abc", state: "PROCESSING" } }));
+      if (url.endsWith("/v1beta/files/abc")) return new Response(JSON.stringify({ name: "files/abc", uri: "https://g/files/abc", state: "ACTIVE" }));
+      return geminiReply(PHO_MENU);
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: true, advanceTimeDelta: 500 });
+    try {
+      const r = await readMenuPhoto(big, { fetchFn: fetchFn as unknown as typeof fetch });
+      expect(r.categories[0].items).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(calls).toEqual(["POST /upload/v1beta/files", "POST /session1", "GET /v1beta/files/abc", "POST /v1beta/models/m-lite:generateContent"]);
+    const body = JSON.parse(fetchFn.mock.calls[3][1].body as string);
+    expect(body.contents[0].parts[0]).toEqual({ file_data: { mime_type: "application/pdf", file_uri: "https://g/files/abc" } });
+    expect((fetchFn.mock.calls[0][1].headers as Record<string, string>)["X-Goog-Upload-Header-Content-Length"]).toBe(String(11 * 1024 * 1024));
+  });
+});

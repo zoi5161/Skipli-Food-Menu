@@ -142,3 +142,9 @@ Sau khi chuyển, tắt rồi chạy lại `npm run dev`. Bản cài đặt trê
 
 - Thêm biến `STAFF_EMAILS` trên Vercel (Settings → Environment Variables), ví dụ `an@skipli.com,binh@gmail.com`, hoặc `@skipli.com` để cho cả tên miền. Ai có trong danh sách thì vào Studio, thấy mọi quán và nhập được CSV.
 - Database trên mạng cần thêm cột mã menu trước khi dùng bản mới: chạy `npx prisma migrate deploy` khi `.env` đang ở chế độ dùng chung (`npm run env:shared`).
+
+## 11. Bulk upload và PDF lớn
+
+- Supabase → Storage → bucket `skipli-menu-images` → **Edit bucket**: ở **Allowed MIME types** thêm `application/pdf` (hoặc để trống để nhận mọi loại), và đặt **File size limit** từ 20 MB trở lên. Chưa làm bước này thì tải PDF lên sẽ báo lỗi.
+- Chạy `npx prisma migrate deploy` (chế độ dùng chung) để database trên mạng có bảng lịch sử menu và hàng chờ đọc file.
+- AI đọc file phía sau tới 5 phút mỗi lượt. Đọc nhiều file liên tục cần `REVALIDATE_SECRET` (đã có) hoặc `JOBS_SECRET` trên Vercel để app tự gọi lượt tiếp theo; trang Bulk upload đang mở cũng tự gọi tiếp.

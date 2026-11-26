@@ -22,5 +22,5 @@ export function restaurantIdFromPath(pathname: string): string | null {
   const m = /^\/(?:restaurants|preview)\/([^/]+)/.exec(pathname);
   if (!m) return null;
   const id = decodeURIComponent(m[1]);
-  return id === "import" || id === "new" ? null : id;
+  return id === "import" || id === "new" || id === "bulk" ? null : id;
 }

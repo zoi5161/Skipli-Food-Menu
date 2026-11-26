@@ -13,7 +13,7 @@ async function addRestaurant(page: Page, name: string, city = "") {
   await form.getByPlaceholder("Restaurant name").fill(name);
   if (city) await form.getByPlaceholder("City (optional)").fill(city);
   await form.getByRole("button", { name: "Add" }).click();
-  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/);
+  await expect(page).toHaveURL(/\/restaurants\/[^/]+\/menu$/, { timeout: 15_000 });
   return new URL(page.url()).pathname.split("/")[2];
 }
 

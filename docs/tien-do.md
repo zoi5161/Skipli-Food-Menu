@@ -104,3 +104,9 @@
 - App chuyển thành công cụ cho nhân viên Skipli quản lý nhiều nhà hàng. Thanh trên cùng có **Restaurants** (danh sách quán: tìm theo tên hoặc thành phố, lọc "No menu yet" / "Live", thêm quán nhanh) và **Import CSV** (nhập nhiều quán một lần từ file Excel / Google Sheets, xem trước từng dòng, dòng lỗi bị bỏ, quán đã có thì không nhập trùng, tự đoán múi giờ theo bang). Bấm vào một quán thì có các mục Overview · Menu · Stats · Settings như trước.
 - Tải **menu PDF** (nhiều trang, tới 4 MB) hoặc ảnh: AI đọc ra danh mục, món, giá (thử thật: menu PDF 15 món đọc đủ trong khoảng 4 giây), thay vì chờ workflow 12–24 giờ. Nhân viên xem lại, sửa rồi mới thêm.
 - Mỗi quán có **mã menu** (dạng `9d5df48e-0822-...`) kèm nút Copy, để dán vào Skipli Now. Link `/api/menus/<mã>` trả dữ liệu món dạng JSON. Mã giữ nguyên khi sửa menu, nên chỉ cần dán một lần. Danh sách nhân viên ghi trong biến `STAFF_EMAILS`; người không phải nhân viên chỉ thấy quán của mình.
+
+## Bulk upload, PDF tới 20 MB, lịch sử menu (26-11-2026)
+
+- Trang **Bulk upload**: chọn nhiều file menu một lúc, app tự gợi ý quán theo tên file (ví dụ `casa-lupita-menu.pdf` → Casa Lupita Taqueria). AI đọc **phía sau trên máy chủ**, đóng trang vẫn chạy; mỗi file hiện "Đang đọc", "Chờ duyệt" hoặc "Lỗi" (có nút thử lại). Danh sách quán có lọc **To review**, bấm **Review** để xem lại món rồi thêm vào menu.
+- Nhận menu PDF tới **20 MB** (trước đây 4 MB): trình duyệt tải file thẳng lên kho, file lớn được gửi cho Gemini qua kho file của Gemini. Thử thật: PDF 16 MB đọc đủ 15 món trong khoảng 22 giây.
+- **Lịch sử menu** (tab History trong Menu): app tự lưu bản menu cũ trước mỗi lần thêm món từ file, thay cả menu hoặc khôi phục; xem lại và bấm **Restore** để quay về. Khi duyệt có thêm lựa chọn **"Replace the whole menu"**; món trùng tên giữ ảnh và số lượt bấm.

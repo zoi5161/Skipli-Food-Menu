@@ -34,6 +34,9 @@ const MAX_ITEMS = 150;
 const PDF_MAX_ITEMS = 400;
 const PDF_MODEL_TIMEOUT_MS = 60_000;
 const PDF_TOTAL_MS = 100_000;
+// Gemini nhận file gửi kèm trực tiếp tới ~20 MB mỗi yêu cầu (tính cả mã hóa base64, to hơn file ~33%).
+// File lớn hơn mức dưới đây thì tải lên kho file của Gemini trước (Files API) rồi gửi đường dẫn.
+const GEMINI_INLINE_MAX_BASE64 = 14_000_000;
 
 export const MENU_PROMPT = [
   "This is a restaurant menu or price board (a photo, or a PDF with one or more pages). Copy EVERY dish you can read, on every page, into JSON, nothing else:",
@@ -74,7 +77,18 @@ export async function readMenuPhoto(
   if (!pdf && !(MENU_MIME as readonly string[]).includes(mime)) throw new MenuReadError("Use a PDF, JPG, PNG or WebP file", "bad-image");
   if (pdf && !gemini) throw new MenuReadError("Reading PDF menus needs GEMINI_API_KEY", "no-key");
   const maxItems = pdf ? PDF_MAX_ITEMS : MAX_ITEMS;
-  const base64 = Buffer.from(bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes).toString("base64");
+  const raw = bytes instanceof ArrayBuffer ? new Uint8Array(bytes) : bytes;
+  const base64 = Buffer.from(raw).toString("base64");
+  // File lớn: tải lên Gemini một lần, các model dùng chung đường dẫn
+  let filePart: { file_data: { mime_type: string; file_uri: string } } | null = null;
+  if (gemini && base64.length > GEMINI_INLINE_MAX_BASE64) {
+    try {
+      filePart = { file_data: { mime_type: mime, file_uri: await geminiUpload(raw, mime, gemini, fetchFn, signal) } };
+    } catch (e) {
+      if (signal?.aborted) throw e;
+      throw new MenuReadError("Could not send the file to the AI", "unavailable");
+    }
+  }
 
   let answered = false;
   const modelMs = timeouts.geminiModelMs ?? (pdf ? PDF_MODEL_TIMEOUT_MS : GEMINI_MODEL_TIMEOUT_MS);
@@ -91,7 +105,7 @@ export async function readMenuPhoto(
         // The key goes in a header: the newer "AQ." keys are refused as ?key=
         headers: { "Content-Type": "application/json; charset=utf-8", "x-goog-api-key": gemini! },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: base64 } }, { text: MENU_PROMPT }] }],
+          contents: [{ role: "user", parts: [filePart ?? { inline_data: { mime_type: mime, data: base64 } }, { text: MENU_PROMPT }] }],
           generationConfig: { maxOutputTokens: pdf ? 32000 : 8000, temperature: 0, responseMimeType: "application/json" },
         }),
         signal: anySignal(signal, budget),
@@ -108,7 +122,7 @@ export async function readMenuPhoto(
   }
 
   // Groq when Gemini was busy, or answered without a dish it could use (a second opinion is cheap).
-  if (groq && !pdf && base64.length <= GROQ_MAX_BASE64) {
+  if (groq && !pdf && !filePart && base64.length <= GROQ_MAX_BASE64) {
     try {
       const res = await fetchFn(`${process.env.GROQ_API_BASE || "https://api.groq.com/openai/v1"}/chat/completions`, {
         method: "POST",
@@ -186,6 +200,45 @@ export function parseMenuJson(text: string, maxItems = MAX_ITEMS): ReadMenuCateg
 export function toCents(v: unknown): number | null {
   const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(/[^0-9.]/g, "")) : NaN;
   return Number.isFinite(n) && n > 0 && n < 100_000 ? Math.round(n * 100) : null;
+}
+
+/**
+ * Tải file lên Gemini (Files API, giao thức "resumable" 2 bước) rồi chờ file sẵn sàng. Trả về file_uri.
+ * Gemini tự xóa file sau 48 giờ.
+ */
+async function geminiUpload(bytes: Uint8Array, mime: string, key: string, fetchFn: typeof fetch, signal?: AbortSignal): Promise<string> {
+  const base = process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com";
+  const start = await fetchFn(`${base}/upload/v1beta/files`, {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": key,
+      "X-Goog-Upload-Protocol": "resumable",
+      "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(bytes.length),
+      "X-Goog-Upload-Header-Content-Type": mime,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ file: { display_name: "menu" } }),
+    signal: anySignal(signal, 30_000),
+  });
+  const uploadUrl = start.headers.get("x-goog-upload-url");
+  if (!start.ok || !uploadUrl) throw new Error(`Gemini upload start failed (${start.status})`);
+  const done = await fetchFn(uploadUrl, {
+    method: "POST",
+    headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize", "Content-Type": mime },
+    body: bytes as unknown as BodyInit,
+    signal: anySignal(signal, 120_000),
+  });
+  if (!done.ok) throw new Error(`Gemini upload failed (${done.status})`);
+  let file = (await done.json()).file as { name: string; uri: string; state?: string };
+  // PDF cần vài giây để Gemini xử lý trước khi dùng được
+  for (let i = 0; file.state === "PROCESSING" && i < 30; i++) {
+    await new Promise((r) => setTimeout(r, 2_000));
+    const res = await fetchFn(`${base}/v1beta/${file.name}`, { headers: { "x-goog-api-key": key }, signal: anySignal(signal, 15_000) });
+    if (res.ok) file = await res.json();
+  }
+  if (file.state && file.state !== "ACTIVE") throw new Error(`Gemini file not ready (${file.state})`);
+  return file.uri;
 }
 
 function anySignal(signal: AbortSignal | undefined, ms: number) {

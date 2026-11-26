@@ -5,7 +5,10 @@
 // 2) chỉ sửa dữ liệu thuộc quán đó,
 // 3) xóa bản lưu đệm của trang khách và làm mới màn hình (expireRestaurantCache).
 
+import { after } from "next/server";
 import { expireRestaurantCache } from "@/lib/menu/expire";
+import { takeSnapshot, replaceMenu } from "@/lib/menu/history";
+import { removeJobFile } from "@/lib/menu/jobs";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRestaurant } from "@/lib/restaurant";
@@ -388,12 +391,16 @@ export async function reorder(
   }
 }
 
-// ──────────────────── Nhập menu từ ảnh (sau khi chủ quán xem lại) ────────────────────
+// ──────────────────── Nhập menu từ file / ảnh (sau khi xem lại) ────────────────────
 
 // Một menu PDF nhiều trang có thể tới vài trăm món (AI đọc tối đa 400 món mỗi file).
 const MAX_IMPORT_DISHES = 400;
 
 const importInput = z.object({
+  // "add": thêm vào menu đang có; "replace": thay cả menu (món trùng tên giữ ảnh, nhãn và lượt bấm)
+  mode: z.enum(["add", "replace"]).default("add"),
+  // File ở trang Bulk upload: đánh dấu đã thêm vào menu
+  jobId: z.string().min(1).max(40).optional(),
   categories: z
     .array(
       z.object({
@@ -401,7 +408,7 @@ const importInput = z.object({
         items: z
           .array(
             z.object({
-              name: z.string().trim().min(1, "Each dish needs a name").max(80),
+              name: z.string().trim().min(1, "Each dish needs a name").max(120),
               description: z.string().trim().max(500).nullable(),
               priceCents: z.number().int().min(0).max(10_000_000).nullable(),
               variants: z
@@ -416,56 +423,80 @@ const importInput = z.object({
     .max(60),
 });
 
-
 /**
- * Lưu các món AI đọc được (chủ quán đã xem lại, sửa, bỏ món sai).
- * Món vào danh mục cùng tên nếu đã có (không phân biệt hoa thường), nếu chưa thì tạo danh mục mới.
+ * Lưu các món AI đọc được (đã xem lại, sửa, bỏ món sai). Lưu bản menu cũ vào History trước.
+ * - add: món vào danh mục cùng tên nếu đã có (không phân biệt hoa thường), nếu chưa thì tạo danh mục mới.
+ * - replace: menu sau khi lưu đúng bằng danh sách này (xem replaceMenu).
  * Lưu tất cả trong một lần: lỗi thì không lưu món nào.
  */
 export async function importMenu(input: z.input<typeof importInput>): Promise<ActionResult & { added?: number; newCategories?: number }> {
   try {
-    const { restaurant } = await requireRestaurant();
+    const { restaurant, user } = await requireRestaurant();
     const data = importInput.parse(input);
     const total = data.categories.reduce((n, c) => n + c.items.length, 0);
     if (total === 0) throw new Error("USER:Choose at least one dish to add");
     if (total > MAX_IMPORT_DISHES) throw new Error(`USER:Add up to ${MAX_IMPORT_DISHES} dishes at a time`);
+    if (data.jobId) {
+      const job = await db.menuJob.findFirst({ where: { id: data.jobId, restaurantId: restaurant.id }, select: { status: true } });
+      if (!job) throw new Error("USER:This upload was not found. Please reload the page.");
+      if (job.status === "APPLIED") throw new Error("USER:This file was already added to the menu.");
+    }
 
-    const result = await db.$transaction(async (tx) => {
-      const existing = await tx.category.findMany({ where: { restaurantId: restaurant.id }, select: { id: true, name: true, position: true } });
-      const byName = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c.id]));
-      let nextCatPos = existing.reduce((m, c) => Math.max(m, c.position), -1) + 1;
-      let added = 0;
-      let newCategories = 0;
-      for (const cat of data.categories) {
-        if (cat.items.length === 0) continue;
-        let categoryId = byName.get(cat.name.toLowerCase());
-        if (!categoryId) {
-          categoryId = (await tx.category.create({ data: { restaurantId: restaurant.id, name: cat.name, position: nextCatPos++ } })).id;
-          byName.set(cat.name.toLowerCase(), categoryId);
-          newCategories++;
+    const result = await db.$transaction(
+      async (tx) => {
+        await takeSnapshot(
+          tx,
+          restaurant.id,
+          data.mode === "replace" ? "replace" : "import",
+          data.mode === "replace" ? `Before replacing the menu with ${total} ${total === 1 ? "dish" : "dishes"} from a file` : `Before adding ${total} ${total === 1 ? "dish" : "dishes"} from a file`,
+          user.email,
+        );
+        if (data.jobId) await tx.menuJob.update({ where: { id: data.jobId }, data: { status: "APPLIED" } });
+
+        if (data.mode === "replace") {
+          const before = await tx.category.count({ where: { restaurantId: restaurant.id } });
+          await replaceMenu(tx, restaurant.id, { version: 1, categories: data.categories });
+          return { added: total, newCategories: Math.max(0, data.categories.length - before) };
         }
-        const last = await tx.menuItem.aggregate({ where: { categoryId }, _max: { position: true } });
-        let pos = (last._max.position ?? -1) + 1;
-        for (const it of cat.items) {
-          // Cỡ: cần ít nhất 2; chỉ 1 cỡ thì coi như một giá
-          const variants = it.variants.length >= 2 ? it.variants : [];
-          const priceCents = variants.length ? Math.min(...variants.map((v) => v.priceCents)) : (it.variants[0]?.priceCents ?? it.priceCents);
-          await tx.menuItem.create({
-            data: {
-              restaurantId: restaurant.id,
-              categoryId,
-              name: it.name,
-              description: it.description || null,
-              priceCents,
-              position: pos++,
-              variants: { create: variants.map((v, i) => ({ name: v.name, priceCents: v.priceCents, position: i })) },
-            },
-          });
-          added++;
+
+        const existing = await tx.category.findMany({ where: { restaurantId: restaurant.id }, select: { id: true, name: true, position: true } });
+        const byName = new Map(existing.map((c) => [c.name.trim().toLowerCase(), c.id]));
+        let nextCatPos = existing.reduce((m, c) => Math.max(m, c.position), -1) + 1;
+        let added = 0;
+        let newCategories = 0;
+        for (const cat of data.categories) {
+          if (cat.items.length === 0) continue;
+          let categoryId = byName.get(cat.name.toLowerCase());
+          if (!categoryId) {
+            categoryId = (await tx.category.create({ data: { restaurantId: restaurant.id, name: cat.name, position: nextCatPos++ } })).id;
+            byName.set(cat.name.toLowerCase(), categoryId);
+            newCategories++;
+          }
+          const last = await tx.menuItem.aggregate({ where: { categoryId }, _max: { position: true } });
+          let pos = (last._max.position ?? -1) + 1;
+          for (const it of cat.items) {
+            // Cỡ: cần ít nhất 2; chỉ 1 cỡ thì coi như một giá
+            const variants = it.variants.length >= 2 ? it.variants : [];
+            const priceCents = variants.length ? Math.min(...variants.map((v) => v.priceCents)) : (it.variants[0]?.priceCents ?? it.priceCents);
+            await tx.menuItem.create({
+              data: {
+                restaurantId: restaurant.id,
+                categoryId,
+                name: it.name,
+                description: it.description || null,
+                priceCents,
+                position: pos++,
+                variants: { create: variants.map((v, i) => ({ name: v.name, priceCents: v.priceCents, position: i })) },
+              },
+            });
+            added++;
+          }
         }
-      }
-      return { added, newCategories };
-    }, { timeout: 60_000 }); // vài trăm món trên database ở xa có thể mất vài giây (mặc định chỉ chờ 5 giây)
+        return { added, newCategories };
+      },
+      { timeout: 60_000 }, // vài trăm món trên database ở xa có thể mất vài giây (mặc định chỉ chờ 5 giây)
+    );
+    if (data.jobId) after(() => removeJobFile(data.jobId!)); // file gốc không cần nữa
     expireRestaurantCache(restaurant);
     return { ok: true, ...result };
   } catch (e) {
