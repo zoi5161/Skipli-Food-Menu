@@ -13,6 +13,7 @@ import { ItemsTab } from "./items-tab";
 import { HistoryTab, type SnapshotRow } from "./history-tab";
 import { ScanMenuButton, ScanMenuDialog, type ReadyJob } from "./scan-menu";
 import { AllergensTab, ExtrasTab } from "./simple-list-tab";
+import { SuggestTagsButton } from "./tag-suggest";
 import { MENU_TABS, TAB_LABEL, type MenuTab } from "../tabs";
 
 export function MenuEditor({
@@ -30,6 +31,7 @@ export function MenuEditor({
 }) {
   const { rid } = useParams<{ rid: string }>();
   const router = useRouter();
+  const current = { categories: data.categories.map((c) => c.name), dishes: data.items.map((i) => ({ name: i.name, priceCents: i.priceCents, variants: i.variants })), currency: data.restaurant.currency };
   const closeReview = () => router.replace(restaurantPath(rid, "menu", tab === "items" ? undefined : { tab }), { scroll: false });
   const [adding, setAdding] = useState(false);
   const hasCategories = data.categories.length > 0;
@@ -48,7 +50,8 @@ export function MenuEditor({
           </div>
           {(tab === "items" || tab === "categories") && (
             <div className="flex flex-wrap gap-2">
-              <ScanMenuButton existingCategories={categories.map((c) => c.name)} dishCount={items.length} variant={hasCategories ? "secondary" : "primary"} />
+              {tab === "items" && items.length > 0 && <SuggestTagsButton />}
+              <ScanMenuButton current={current} variant={hasCategories ? "secondary" : "primary"} />
               <Button onClick={() => setAdding(true)} className="px-5 py-2.5" variant={hasCategories ? "primary" : "secondary"}>
                 {tab === "items" && hasCategories ? "Add an item" : "Add a category"}
               </Button>
@@ -97,7 +100,7 @@ export function MenuEditor({
         {tab === "history" && <HistoryTab rows={history} currency={data.restaurant.currency} />}
 
         {review && (
-          <ScanMenuDialog key={review.id} existingCategories={categories.map((c) => c.name)} dishCount={items.length} job={review} onClose={closeReview} />
+          <ScanMenuDialog key={review.id} current={current} job={review} onClose={closeReview} />
         )}
 
         {adding &&

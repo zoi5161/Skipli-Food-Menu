@@ -110,3 +110,9 @@
 - Trang **Bulk upload**: chọn nhiều file menu một lúc, app tự gợi ý quán theo tên file (ví dụ `casa-lupita-menu.pdf` → Casa Lupita Taqueria). AI đọc **phía sau trên máy chủ**, đóng trang vẫn chạy; mỗi file hiện "Đang đọc", "Chờ duyệt" hoặc "Lỗi" (có nút thử lại). Danh sách quán có lọc **To review**, bấm **Review** để xem lại món rồi thêm vào menu.
 - Nhận menu PDF tới **20 MB** (trước đây 4 MB): trình duyệt tải file thẳng lên kho, file lớn được gửi cho Gemini qua kho file của Gemini. Thử thật: PDF 16 MB đọc đủ 15 món trong khoảng 22 giây.
 - **Lịch sử menu** (tab History trong Menu): app tự lưu bản menu cũ trước mỗi lần thêm món từ file, thay cả menu hoặc khôi phục; xem lại và bấm **Restore** để quay về. Khi duyệt có thêm lựa chọn **"Replace the whole menu"**; món trùng tên giữ ảnh và số lượt bấm.
+
+## Duyệt menu nhanh hơn, AI gợi ý nhãn (27-11-2026)
+
+- Màn hình duyệt menu so sánh với menu đang có: mỗi món ghi **New**, **Price changed $4.50 → $4.75** hoặc **No change**; có nút "Show changes only" để chỉ xem chỗ thay đổi. Khi thay cả menu, hiện danh sách món sẽ bị xóa.
+- Nhắc kiểm tra món **thiếu giá** hoặc **giá $0** (tô vàng, đếm ở đầu màn hình), không chặn việc lưu.
+- Nút **"Suggest tags with AI"** ở tab Items: AI đọc tên và mô tả món, gợi ý nhãn (Vegetarian, Vegan, Spicy…) và chất gây dị ứng (Gluten, Dairy, Shellfish…). Nhân viên bỏ tick gợi ý sai rồi bấm Apply; nhãn món đã có được giữ nguyên.

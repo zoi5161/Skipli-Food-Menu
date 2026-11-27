@@ -12,7 +12,8 @@ export type ReadOutcome =
   | { ok: false; status: number; error: string; retry: boolean };
 
 export async function readMenuForRestaurant(restaurantId: string, file: { bytes: Uint8Array | ArrayBuffer; mime: string }, signal?: AbortSignal): Promise<ReadOutcome> {
-  const used = await db.aiMenuRead.count({ where: { restaurantId, createdAt: { gte: new Date(Date.now() - 86_400_000) } } });
+  // Lần gợi ý nhãn (engine "tags") tính riêng, không trừ vào số lần đọc file
+  const used = await db.aiMenuRead.count({ where: { restaurantId, createdAt: { gte: new Date(Date.now() - 86_400_000) }, OR: [{ engine: null }, { engine: { not: "tags" } }] } });
   if (used >= READS_PER_DAY) {
     return { ok: false, status: 429, retry: false, error: `You can read up to ${READS_PER_DAY} files a day for one restaurant. Please try again tomorrow, or add dishes by hand.` };
   }

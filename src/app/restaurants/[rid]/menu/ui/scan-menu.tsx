@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { Button, Dialog, cx, inputClass, useToast } from "@/components/ui";
+import { compareDish, currentIndex, priceWarning, removedDishes, type DishChange, type PricedDish } from "@/lib/menu/compare";
 import { centsToInput, parsePriceInput } from "@/lib/menu/format";
 import { resizeImage } from "@/lib/resize-image";
 import { restaurantPath } from "@/lib/restaurant-path";
@@ -46,8 +47,23 @@ const cents = (p: string) => {
   const r = parsePriceInput(p);
   return r.ok ? r.cents : null;
 };
+const asDish = (it: DraftItem): PricedDish => ({
+  name: it.name,
+  priceCents: cents(it.price),
+  // cỡ chưa nhập giá đã bị tô đỏ (ô lỗi); ở đây chỉ cần nhận ra giá $0
+  variants: it.variants.map((v) => ({ name: v.name, priceCents: cents(v.price) ?? -1 })),
+});
 
-export function ScanMenuButton({ existingCategories, dishCount, variant = "secondary" }: { existingCategories: string[]; dishCount: number; variant?: "primary" | "secondary" }) {
+const CHANGE_CHIP: Record<DishChange["kind"], string> = {
+  new: "bg-green-50 text-green-700",
+  price: "bg-blue-50 text-blue-700",
+  same: "bg-neutral-100 text-neutral-500",
+};
+
+/** Món đang có trong menu (để so sánh khi duyệt). */
+export type CurrentMenu = { categories: string[]; dishes: PricedDish[]; currency: string };
+
+export function ScanMenuButton({ current, variant = "secondary" }: { current: CurrentMenu; variant?: "primary" | "secondary" }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -58,7 +74,7 @@ export function ScanMenuButton({ existingCategories, dishCount, variant = "secon
         </svg>
         Upload menu
       </Button>
-      {open && <ScanMenuDialog existingCategories={existingCategories} dishCount={dishCount} onClose={() => setOpen(false)} />}
+      {open && <ScanMenuDialog current={current} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -67,14 +83,12 @@ export function ScanMenuButton({ existingCategories, dishCount, variant = "secon
 export type ReadyJob = { id: string; fileName: string; result: ReadResult };
 
 export function ScanMenuDialog({
-  existingCategories,
-  dishCount,
+  current,
   job,
   onClose,
   onSaved,
 }: {
-  existingCategories: string[];
-  dishCount: number;
+  current: CurrentMenu;
   job?: ReadyJob;
   onClose: () => void;
   onSaved?: () => void;
@@ -90,7 +104,9 @@ export function ScanMenuDialog({
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftCategory[]>(() => (job ? toDraft(job.result, []) : []));
   const [saving, setSaving] = useState(false);
-  const existing = new Set(existingCategories.map((n) => n.trim().toLowerCase()));
+  const existing = new Set(current.categories.map((n) => n.trim().toLowerCase()));
+  const dishCount = current.dishes.length;
+  const [changesOnly, setChangesOnly] = useState(false);
 
   function close() {
     abort.current?.abort();
@@ -153,6 +169,17 @@ export function ScanMenuDialog({
 
   const chosen = draft.filter((c) => c.include).flatMap((c) => c.items.filter((it) => it.include).map((it) => ({ c, it })));
   const invalid = chosen.some(({ c, it }) => !c.name.trim() || !it.name.trim() || !priceOk(it.price) || it.variants.some((v) => !v.name.trim() || !priceOk(v.price) || cents(v.price) === null));
+
+  // So sánh với menu đang có + nhắc giá (chỉ tính món đang được chọn)
+  const index = currentIndex(current.dishes);
+  const changeOf = (it: DraftItem) => compareDish(asDish(it), index, current.currency);
+  const counts = { new: 0, price: 0, same: 0 };
+  let warnings = 0;
+  for (const { it } of chosen) {
+    counts[changeOf(it).kind]++;
+    if (priceWarning(asDish(it))) warnings++;
+  }
+  const removed = mode === "replace" ? removedDishes(current.dishes, chosen.map(({ it }) => it)) : [];
 
   async function save() {
     setSaving(true);
@@ -274,6 +301,38 @@ export function ScanMenuDialog({
               </div>
             </fieldset>
           )}
+          {(dishCount > 0 || warnings > 0) && (
+            <div className="space-y-2 rounded-2xl border border-neutral-200 p-3 text-sm" aria-label="Changes" role="region">
+              {dishCount > 0 && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <p>
+                    Compared with the current menu: <b className="text-green-700">{counts.new} new</b> ·{" "}
+                    <b className="text-blue-700">
+                      {counts.price} price {counts.price === 1 ? "change" : "changes"}
+                    </b>{" "}
+                    · <span className="text-neutral-500">{counts.same} no change</span>
+                  </p>
+                  <label className="ml-auto flex items-center gap-2">
+                    <input type="checkbox" checked={changesOnly} onChange={(e) => setChangesOnly(e.target.checked)} className="h-4 w-4 accent-brand" />
+                    Show changes only
+                  </label>
+                </div>
+              )}
+              {warnings > 0 && (
+                <p className="font-medium text-amber-800">
+                  {warnings} {warnings === 1 ? "dish" : "dishes"} to check: no price or $0. Fix the price, or leave it empty for dishes without a price.
+                </p>
+              )}
+              {mode === "replace" && removed.length > 0 && (
+                <details className="text-red-700">
+                  <summary className="font-medium">
+                    Will be removed: {removed.length} {removed.length === 1 ? "dish" : "dishes"} not in the new menu
+                  </summary>
+                  <p className="mt-1">{removed.map((d) => d.name).join(", ")}</p>
+                </details>
+              )}
+            </div>
+          )}
           <p className="text-sm text-neutral-600">
             We read {draft.reduce((n, c) => n + c.items.length, 0)} dishes in {draft.length} {draft.length === 1 ? "category" : "categories"}. Please check names and prices against your menu,
             fix anything that’s off, and untick dishes you don’t want.
@@ -288,58 +347,73 @@ export function ScanMenuDialog({
                   <span className="shrink-0 text-xs text-neutral-500">{mode === "replace" ? "" : merge ? "Adds to your existing category" : "New category"}</span>
                 </div>
                 <ul className="divide-y divide-neutral-100">
-                  {c.items.map((it) => (
-                    <li key={it.key} className={cx("flex gap-3 px-4 py-3", !it.include && "opacity-50")}>
-                      <input type="checkbox" checked={it.include} onChange={(e) => editItem(c.key, it.key, { include: e.target.checked })} aria-label={`Add ${it.name}`} className="mt-3 h-4 w-4 accent-brand" />
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex gap-2">
-                          <input aria-label="Dish name" className={cx(inputClass, "min-w-0 flex-1", !it.name.trim() && "border-red-400")} value={it.name} onChange={(e) => editItem(c.key, it.key, { name: e.target.value })} maxLength={120} />
-                          {it.variants.length === 0 && (
-                            <div className="relative w-28 shrink-0">
-                              <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-neutral-400">$</span>
-                              <input
-                                aria-label={`Price of ${it.name}`}
-                                className={cx(inputClass, "pl-7 text-right tabular-nums", !priceOk(it.price) && "border-red-400")}
-                                value={it.price}
-                                onChange={(e) => editItem(c.key, it.key, { price: e.target.value })}
-                                inputMode="decimal"
-                                placeholder="No price"
-                              />
+                  {c.items.map((it) => {
+                    const change = dishCount > 0 ? changeOf(it) : null;
+                    const warn = it.include ? priceWarning(asDish(it)) : null;
+                    if (changesOnly && change?.kind === "same" && !warn) return null;
+                    return (
+                      <li key={it.key} className={cx("flex gap-3 px-4 py-3", !it.include && "opacity-50", warn && "bg-amber-50")}>
+                        <input type="checkbox" checked={it.include} onChange={(e) => editItem(c.key, it.key, { include: e.target.checked })} aria-label={`Add ${it.name}`} className="mt-3 h-4 w-4 accent-brand" />
+                        <div className="min-w-0 flex-1 space-y-2">
+                          <div className="flex gap-2">
+                            <input aria-label="Dish name" className={cx(inputClass, "min-w-0 flex-1", !it.name.trim() && "border-red-400")} value={it.name} onChange={(e) => editItem(c.key, it.key, { name: e.target.value })} maxLength={120} />
+                            {it.variants.length === 0 && (
+                              <div className="relative w-28 shrink-0">
+                                <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-sm text-neutral-400">$</span>
+                                <input
+                                  aria-label={`Price of ${it.name}`}
+                                  className={cx(inputClass, "pl-7 text-right tabular-nums", !priceOk(it.price) && "border-red-400")}
+                                  value={it.price}
+                                  onChange={(e) => editItem(c.key, it.key, { price: e.target.value })}
+                                  inputMode="decimal"
+                                  placeholder="No price"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {it.variants.length > 0 && (
+                            <div className="flex flex-wrap gap-2" aria-label={`Sizes of ${it.name}`}>
+                              {it.variants.map((v, vi) => (
+                                <span key={vi} className="flex items-center gap-1 rounded-xl bg-neutral-50 p-1">
+                                  <input
+                                    aria-label={`Size ${vi + 1} of ${it.name}`}
+                                    className="w-24 rounded-lg border border-neutral-200 px-2 py-1 text-sm"
+                                    value={v.name}
+                                    onChange={(e) => editItem(c.key, it.key, { variants: it.variants.map((x, j) => (j === vi ? { ...x, name: e.target.value } : x)) })}
+                                  />
+                                  <input
+                                    aria-label={`Price of ${it.name} ${v.name}`}
+                                    className={cx("w-20 rounded-lg border border-neutral-200 px-2 py-1 text-right text-sm tabular-nums", (!priceOk(v.price) || cents(v.price) === null) && "border-red-400")}
+                                    value={v.price}
+                                    onChange={(e) => editItem(c.key, it.key, { variants: it.variants.map((x, j) => (j === vi ? { ...x, price: e.target.value } : x)) })}
+                                    inputMode="decimal"
+                                  />
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <input
+                            aria-label={`Description of ${it.name}`}
+                            className={cx(inputClass, "text-sm")}
+                            value={it.description}
+                            onChange={(e) => editItem(c.key, it.key, { description: e.target.value })}
+                            placeholder="Description (optional)"
+                            maxLength={500}
+                          />
+                          {(change || warn) && (
+                            <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
+                              {change && (
+                                <span className={cx("rounded-full px-2 py-0.5", CHANGE_CHIP[change.kind])}>
+                                  {change.kind === "new" ? "New" : change.kind === "same" ? "No change" : `Price changed: ${change.from} → ${change.to}`}
+                                </span>
+                              )}
+                              {warn && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-amber-800">⚠ {warn}</span>}
                             </div>
                           )}
                         </div>
-                        {it.variants.length > 0 && (
-                          <div className="flex flex-wrap gap-2" aria-label={`Sizes of ${it.name}`}>
-                            {it.variants.map((v, vi) => (
-                              <span key={vi} className="flex items-center gap-1 rounded-xl bg-neutral-50 p-1">
-                                <input
-                                  aria-label={`Size ${vi + 1} of ${it.name}`}
-                                  className="w-24 rounded-lg border border-neutral-200 px-2 py-1 text-sm"
-                                  value={v.name}
-                                  onChange={(e) => editItem(c.key, it.key, { variants: it.variants.map((x, j) => (j === vi ? { ...x, name: e.target.value } : x)) })}
-                                />
-                                <input
-                                  aria-label={`Price of ${it.name} ${v.name}`}
-                                  className={cx("w-20 rounded-lg border border-neutral-200 px-2 py-1 text-right text-sm tabular-nums", (!priceOk(v.price) || cents(v.price) === null) && "border-red-400")}
-                                  value={v.price}
-                                  onChange={(e) => editItem(c.key, it.key, { variants: it.variants.map((x, j) => (j === vi ? { ...x, price: e.target.value } : x)) })}
-                                  inputMode="decimal"
-                                />
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <input
-                          aria-label={`Description of ${it.name}`}
-                          className={cx(inputClass, "text-sm")}
-                          value={it.description}
-                          onChange={(e) => editItem(c.key, it.key, { description: e.target.value })}
-                          placeholder="Description (optional)"
-                          maxLength={500}
-                        />
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             );
